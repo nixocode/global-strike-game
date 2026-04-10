@@ -1,0 +1,2287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; connect-src 'self' https:; font-src 'self' https://fonts.gstatic.com;">
+<title>GLOBAL STRIKE — Nuclear Strategy</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070a0f;--bg2:#0d1117;--bg3:#161b22;--bg4:#1c2230;
+  --text:#c9d1d9;--text2:#8b949e;--text3:#484f58;
+  --red:#f85149;--red-glow:rgba(248,81,73,.4);
+  --orange:#d29922;--orange-glow:rgba(210,153,34,.35);
+  --yellow:#e3b341;--yellow-glow:rgba(227,179,65,.3);
+  --blue:#58a6ff;--blue-glow:rgba(88,166,255,.3);
+  --green:#3fb950;--green-glow:rgba(63,185,80,.3);
+  --accent:#7c72ff;--accent2:#a5a0ff;
+  --border:rgba(240,246,252,.06);
+  --border2:rgba(240,246,252,.1);
+  --glass:rgba(13,17,23,.75);
+  --glass2:rgba(13,17,23,.9);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
+
+/* ─── Layout ─── */
+.app{display:grid;grid-template-rows:auto 1fr;grid-template-columns:1fr 400px;height:100vh;position:relative}
+
+/* ─── Top Bar ─── */
+.top-bar{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:10px 24px;background:var(--glass2);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);z-index:100;position:relative}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:10px;height:10px;border-radius:50%;background:#ff4444;box-shadow:0 0 12px rgba(255,68,68,.6),0 0 30px rgba(255,68,68,.2);animation:pulse-dot 1.5s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.logo-text{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--red)}
+.logo-year{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;margin-left:4px;padding:2px 8px;border:1px solid var(--border2);border-radius:3px}
+.stats-row{display:flex;gap:20px;margin-left:auto;align-items:center}
+.stat{text-align:center;padding:0 16px;border-right:1px solid var(--border)}
+.stat:last-child{border:none;padding-right:0}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:#fff}
+.stat-val.danger{color:var(--red)}
+.stat-val.warn{color:var(--orange)}
+.stat-val.info{color:var(--blue)}
+.stat-label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-top:2px}
+.mobile-toggle{display:none;background:none;border:1px solid var(--border2);color:var(--text2);padding:6px 10px;border-radius:4px;cursor:pointer;font-size:16px}
+
+/* ─── Globe Area ─── */
+.globe-area{position:relative;overflow:hidden;background:var(--bg);cursor:grab;-webkit-user-select:none;user-select:none}
+.globe-area:active{cursor:grabbing}
+.globe-area.dragging{cursor:grabbing}
+#globeCanvas{width:100%;height:100%;display:block}
+
+/* ─── Globe Overlays ─── */
+.zoom-controls{position:absolute;bottom:24px;right:24px;display:flex;flex-direction:column;gap:4px;z-index:20}
+.zoom-btn{width:36px;height:36px;background:var(--glass);border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;font-family:'JetBrains Mono',monospace;backdrop-filter:blur(12px)}
+.zoom-btn:hover{background:var(--bg4);color:#fff;border-color:var(--accent);transform:scale(1.05)}
+.time-stamp{position:absolute;top:16px;left:16px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:1px;z-index:20;background:var(--glass);padding:6px 12px;border-radius:6px;border:1px solid var(--border);backdrop-filter:blur(12px)}
+.legend{position:absolute;bottom:24px;left:24px;display:flex;gap:14px;z-index:20;background:var(--glass);padding:10px 16px;border-radius:8px;border:1px solid var(--border);backdrop-filter:blur(12px)}
+.legend-item{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.5px}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+.globe-controls-row{position:absolute;top:16px;right:24px;z-index:20;display:flex;gap:6px}
+.globe-ctrl-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);background:var(--glass);border:1px solid var(--border);padding:6px 14px;border-radius:6px;cursor:pointer;backdrop-filter:blur(12px);transition:all .25s}
+.globe-ctrl-btn:hover,.globe-ctrl-btn.active{color:var(--accent2);border-color:var(--accent)}
+
+/* ─── Tooltip ─── */
+.tooltip{position:fixed;z-index:1000;pointer-events:none;background:var(--glass2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);max-width:280px;opacity:0;transform:translateY(6px);transition:opacity .15s,transform .15s;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.tooltip.visible{opacity:1;transform:translateY(0)}
+.tt-name{font-size:13px;font-weight:600;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.tt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tt-region{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.tt-summary{font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px}
+.tt-stats{display:flex;gap:12px}
+.tt-stat{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+.tt-stat span{color:var(--text)}
+
+/* ─── Country Tooltip ─── */
+.country-tooltip{position:fixed;z-index:1001;pointer-events:auto;background:var(--glass2);border:1px solid var(--border2);border-radius:10px;padding:16px 20px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);max-width:320px;min-width:220px;opacity:0;transform:translateY(8px) scale(0.97);transition:opacity .2s,transform .2s;box-shadow:0 12px 48px rgba(0,0,0,.5),0 0 0 1px rgba(124,114,255,.08);display:none}
+.country-tooltip.visible{opacity:1;transform:translateY(0) scale(1);display:block}
+.ct-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ct-flag{font-size:28px;line-height:1}
+.ct-name{font-size:15px;font-weight:700;color:#fff;letter-spacing:.3px}
+.ct-region{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.ct-conflicts-title{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent2);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.ct-conflicts-title::before{content:'';width:3px;height:10px;background:var(--accent);border-radius:2px}
+.ct-conflict-link{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;background:rgba(124,114,255,.06);border:1px solid rgba(124,114,255,.12);cursor:pointer;transition:all .2s;margin-bottom:4px}
+.ct-conflict-link:hover{background:rgba(124,114,255,.15);border-color:var(--accent);transform:translateX(2px)}
+.ct-conflict-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.ct-conflict-name{font-size:11px;color:var(--text);font-weight:500;flex:1}
+.ct-conflict-sev{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.ct-no-conflict{font-size:11px;color:var(--text3);padding:4px 0;font-style:italic}
+.ct-close{position:absolute;top:8px;right:8px;background:none;border:1px solid var(--border);color:var(--text3);width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.ct-close:hover{color:#fff;border-color:var(--accent);background:rgba(124,114,255,.15)}
+
+/* ─── HTML Markers & Leader Lines ─── */
+.leader-lines{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:25}
+.html-markers-container{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:30}
+.html-marker{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .2s}
+.html-marker.hidden{opacity:0;pointer-events:none}
+.html-marker-core{border-radius:50%;position:relative;z-index:2;transition:transform .2s}
+.html-marker:hover .html-marker-core{transform:scale(1.5)}
+.html-marker.active .html-marker-core{transform:scale(1.5)}
+.html-marker-glow{position:absolute;border-radius:50%;z-index:1}
+.html-marker-ring{position:absolute;border-radius:50%;border:2px solid transparent;z-index:3;opacity:0.6}
+.html-marker-nuke{position:absolute;border-radius:50%;border:1px solid var(--red);z-index:4;opacity:0.3}
+
+/* ─── Iran Deep-Dive Tab ─── */
+.iran-hero{padding:20px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(248,81,73,.06),rgba(210,153,34,.04))}
+.iran-hero-title{font-size:16px;font-weight:700;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.iran-hero-sub{font-size:11px;color:var(--text2);line-height:1.5}
+.iran-hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.iran-hero-stat{background:var(--bg3);padding:10px;border-radius:6px;border:1px solid var(--border);text-align:center}
+.iran-hero-stat .val{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#fff}
+.iran-hero-stat .lbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-top:2px}
+.iran-section{padding:16px 20px;border-bottom:1px solid var(--border)}
+.iran-section-title{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent2);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.iran-section-title::before{content:'';width:3px;height:12px;background:var(--accent);border-radius:2px}
+.timeline-event{display:flex;gap:12px;padding:8px 0;position:relative}
+.timeline-event+.timeline-event{border-top:1px solid var(--border)}
+.te-date{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);width:70px;flex-shrink:0;padding-top:2px}
+.te-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.te-dot.escalation{background:var(--red);box-shadow:0 0 6px var(--red-glow)}
+.te-dot.strike{background:var(--orange);box-shadow:0 0 6px var(--orange-glow)}
+.te-dot.diplomacy{background:var(--green);box-shadow:0 0 6px var(--green-glow)}
+.te-dot.intel{background:var(--blue);box-shadow:0 0 6px var(--blue-glow)}
+.te-text{font-size:11px;color:var(--text);line-height:1.5;flex:1}
+.te-text strong{color:#fff;font-weight:600}
+
+/* ─── Military Cards ─── */
+.mil-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:8px}
+.mil-card-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer}
+.mil-card-flag{font-size:18px}
+.mil-card-name{font-size:13px;font-weight:600;color:#fff;flex:1}
+.mil-card-toggle{font-size:10px;color:var(--text3);transition:transform .2s}
+.mil-card-toggle.open{transform:rotate(180deg)}
+.mil-card-body{display:none;overflow:hidden}
+.mil-card-body.open{display:block}
+.mil-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px}
+.mil-row:last-child{border:none}
+.mil-row .k{color:var(--text2)}
+.mil-row .v{font-family:'JetBrains Mono',monospace;color:#fff;font-weight:500}
+.mil-row .v.danger{color:var(--red)}
+.mil-row .v.warn{color:var(--orange)}
+.mil-row .v.info{color:var(--blue)}
+.mil-row .v.green{color:var(--green)}
+.mil-sub{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin:10px 0 6px;padding-top:6px;border-top:1px solid var(--border)}
+.mil-bar{height:4px;background:var(--bg4);border-radius:2px;margin-top:4px;overflow:hidden}
+.mil-bar-fill{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.mil-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.mil-compare-item{text-align:center;padding:8px;background:var(--bg4);border-radius:6px;border:1px solid var(--border)}
+.mil-compare-val{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700}
+.mil-compare-lbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-top:2px}
+
+/* ─── Weapons Systems ─── */
+.weapon-chip{display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 8px;border-radius:4px;background:var(--bg4);border:1px solid var(--border);color:var(--text2);margin:2px}
+
+/* ─── Vector Labels ─── */
+.vector-label{position:absolute;pointer-events:none;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(200,210,225,.35);white-space:nowrap;transform:translate(-50%,-50%);transition:opacity .3s;text-shadow:0 0 8px rgba(0,0,0,.8)}
+.vector-label.visible{color:rgba(200,210,225,.5)}
+.conflict-zone-label{position:absolute;pointer-events:none;font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;transform:translate(-50%,-50%);padding:2px 6px;border-radius:3px;border:1px solid;transition:opacity .3s}
+
+/* ─── Sidebar ─── */
+.sidebar{background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:50;transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.sidebar-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+.sidebar-tabs{display:flex;gap:0;border:1px solid var(--border2);border-radius:6px;overflow:hidden}
+.sidebar-tab{flex:1;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;padding:8px 12px;background:transparent;border:none;color:var(--text3);cursor:pointer;transition:all .25s;text-align:center}
+.sidebar-tab:hover{color:var(--text2);background:var(--bg3)}
+.sidebar-tab.active{color:var(--accent2);background:rgba(124,114,255,.1)}
+.search-box{position:relative}
+.search-box input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 12px 8px 32px;font-size:11px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color .25s,box-shadow .25s}
+.search-box input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,114,255,.12)}
+.search-box input::placeholder{color:var(--text3)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:12px}
+.filters{display:flex;flex-wrap:wrap;gap:5px}
+.filter-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border:1px solid var(--border2);border-radius:4px;background:transparent;color:var(--text3);cursor:pointer;transition:all .25s;user-select:none}
+.filter-btn:hover,.filter-btn.active{border-color:var(--accent);color:var(--accent2);background:rgba(124,114,255,.1)}
+.sort-controls{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.sort-btn{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:transparent;color:var(--text3);cursor:pointer;transition:all .25s;user-select:none}
+.sort-btn:hover,.sort-btn.active{border-color:var(--accent);color:var(--accent2);background:rgba(124,114,255,.08)}
+.dp-related{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.dp-related-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-top:14px;margin-bottom:6px;font-family:'JetBrains Mono',monospace}
+.dp-related-chip{font-size:10px;padding:4px 12px;border-radius:4px;background:rgba(124,114,255,.08);border:1px solid rgba(124,114,255,.2);color:var(--accent2);cursor:pointer;transition:all .2s;user-select:none}
+.dp-related-chip:hover{background:rgba(124,114,255,.18);border-color:var(--accent);transform:translateY(-1px)}
+
+/* ─── Timeline Slider ─── */
+.timeline-container{padding:8px 20px 12px;border-bottom:1px solid var(--border)}
+.timeline-label{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.5px;margin-bottom:6px}
+.timeline-slider{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:var(--bg4);border-radius:2px;outline:none;cursor:pointer}
+.timeline-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg2);cursor:pointer;box-shadow:0 0 8px rgba(124,114,255,.4);transition:transform .2s}
+.timeline-slider::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.timeline-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg2);cursor:pointer}
+
+/* ─── Sidebar Content ─── */
+.sidebar-content{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.tab-panel{flex:1;overflow-y:auto;padding:8px;display:none}
+.tab-panel.active{display:block}
+.tab-panel::-webkit-scrollbar{width:4px}
+.tab-panel::-webkit-scrollbar-track{background:transparent}
+.tab-panel::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ─── Conflict Cards ─── */
+.conflict-card{padding:14px 16px;border-radius:8px;border:1px solid transparent;cursor:pointer;transition:all .25s;margin-bottom:4px;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none}
+.conflict-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:3px 0 0 3px;opacity:0;transition:opacity .25s}
+.conflict-card:hover{background:var(--bg3);border-color:var(--border2)}
+.conflict-card:hover::before{opacity:1}
+.conflict-card.sev-war::before{background:var(--red)}
+.conflict-card.sev-high::before{background:var(--orange)}
+.conflict-card.sev-medium::before{background:var(--yellow)}
+.conflict-card.sev-tension::before{background:var(--blue)}
+.conflict-card.active{background:var(--bg4);border-color:var(--accent);box-shadow:0 0 20px rgba(124,114,255,.08)}
+.cc-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.cc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cc-dot.war{background:var(--red);box-shadow:0 0 8px var(--red-glow)}
+.cc-dot.high{background:var(--orange);box-shadow:0 0 8px var(--orange-glow)}
+.cc-dot.medium{background:var(--yellow);box-shadow:0 0 8px var(--yellow-glow)}
+.cc-dot.tension{background:var(--blue);box-shadow:0 0 8px var(--blue-glow)}
+.cc-name{font-size:13px;font-weight:600;color:#e6edf3;flex:1}
+.cc-region{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;padding:2px 6px;border:1px solid var(--border);border-radius:3px;flex-shrink:0}
+.cc-summary{font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px}
+.cc-stats{display:flex;gap:12px}
+.cc-stat{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+.cc-stat span{color:var(--text)}
+.nuke-badge{display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--red);border:1px solid rgba(248,81,73,.25);border-radius:3px;padding:2px 6px;margin-left:6px;background:rgba(248,81,73,.06)}
+.nuke-icon{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse-dot 1.5s infinite}
+
+/* ─── Mini Charts ─── */
+.charts-panel{padding:16px 20px;border-bottom:1px solid var(--border)}
+.chart-title{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.bar-chart{display:flex;flex-direction:column;gap:6px}
+.bar-row{display:flex;align-items:center;gap:8px}
+.bar-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);width:60px;text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.bar-val{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text2);width:28px;text-align:right;flex-shrink:0}
+.intensity-row{display:flex;gap:8px;margin-top:12px}
+.intensity-block{flex:1;text-align:center;padding:8px 4px;border-radius:6px;background:var(--bg3);border:1px solid var(--border)}
+.intensity-count{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700}
+.intensity-label{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-top:2px}
+
+/* ─── News Feed ─── */
+.news-item{padding:14px 16px;border-radius:8px;border:1px solid transparent;transition:all .25s;margin-bottom:4px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.news-item:hover{background:var(--bg3);border-color:var(--border2)}
+.news-source{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.news-source-dot{width:4px;height:4px;border-radius:50%;background:var(--green)}
+.news-title{font-size:13px;font-weight:600;color:#e6edf3;line-height:1.4;margin-bottom:4px}
+.news-desc{font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:6px}
+.news-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)}
+.news-loading{text-align:center;padding:40px;color:var(--text3);font-size:12px}
+.news-loading .spinner{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── Detail Panel ─── */
+.detail-panel{position:absolute;bottom:0;left:0;right:400px;background:linear-gradient(to top,var(--glass2) 80%,transparent);padding:28px 32px 24px;transform:translateY(100%);transition:transform .4s cubic-bezier(.4,0,.2,1);z-index:30;border-top:1px solid var(--border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.detail-panel.visible{transform:translateY(0)}
+.dp-close{position:absolute;top:12px;right:16px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .25s}
+.dp-close:hover{background:var(--bg4);color:#fff;border-color:var(--accent)}
+.dp-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:4px;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.dp-sub{font-size:11px;color:var(--text2);margin-bottom:14px}
+.dp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.dp-metric{background:var(--bg3);padding:12px 14px;border-radius:8px;border:1px solid var(--border)}
+.dp-metric-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:#fff}
+.dp-metric-label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-top:3px}
+.dp-summary{font-size:12px;color:var(--text2);line-height:1.65;margin-bottom:14px}
+.dp-parties{display:flex;flex-wrap:wrap;gap:6px}
+.dp-party{font-size:10px;padding:4px 12px;border-radius:4px;background:var(--bg4);border:1px solid var(--border2);color:var(--text2);transition:all .2s}
+.dp-party:hover{border-color:var(--accent);color:var(--accent2)}
+
+/* ─── Animations ─── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.conflict-card,.news-item{animation:fadeInUp .3s ease-out backwards}
+
+/* ─── Mobile ─── */
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  .sidebar{position:fixed;top:0;right:0;bottom:0;width:85%;max-width:400px;transform:translateX(100%);z-index:200;box-shadow:-8px 0 40px rgba(0,0,0,.5)}
+  .sidebar.open{transform:translateX(0)}
+  .mobile-toggle{display:flex}
+  .mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;backdrop-filter:blur(4px)}
+  .mobile-overlay.visible{display:block}
+  .detail-panel{right:0}
+  .stats-row{display:none}
+  .legend{flex-wrap:wrap;bottom:12px;left:12px;gap:8px;padding:8px 12px}
+  .dp-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .legend{display:none}
+  .top-bar{padding:8px 12px}
+  .logo-text{font-size:9px;letter-spacing:1.5px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top-bar">
+    <div class="logo">
+      <div class="logo-icon"></div>
+      <span class="logo-text">Global Strike</span>
+      <span class="logo-year" style="border-color:var(--red);color:var(--red)">☢ NUCLEAR</span>
+    </div>
+    <div class="stats-row" id="globalStats"></div>
+    <button class="mobile-toggle" id="mobileToggle" onclick="toggleSidebar()">&#9776;</button>
+  </div>
+
+  <div class="globe-area" id="globeArea">
+    <canvas id="globeCanvas"></canvas>
+    <div class="time-stamp" id="timeStamp"></div>
+    <div class="globe-controls-row">
+      <button class="globe-ctrl-btn active" id="autoRotateBtn" onclick="toggleAutoRotate()">Auto-rotate</button>
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomGlobe(1)">+</button>
+      <button class="zoom-btn" onclick="zoomGlobe(-1)">&minus;</button>
+      <button class="zoom-btn" onclick="resetGlobe()" style="font-size:10px">R</button>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue);box-shadow:0 0 6px var(--blue-glow)"></div>Your nation</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--red);box-shadow:0 0 6px var(--red-glow)"></div>Enemy</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--text3)"></div>Neutral</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--orange);box-shadow:0 0 6px var(--orange-glow)"></div>Destroyed</div>
+    </div>
+    <div class="detail-panel" id="detailPanel">
+      <button class="dp-close" onclick="closeDetail()">&times;</button>
+      <div id="detailContent"></div>
+    </div>
+    <svg class="leader-lines" id="leaderLines"></svg>
+    <div class="html-markers-container" id="htmlMarkers"></div>
+  </div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header" style="gap:0">
+      <div id="gamePhaseHeader" style="padding:10px 0 8px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--red)">☢ SELECT YOUR NATION</div>
+    </div>
+    <div id="playerInfo" style="display:none;padding:12px 20px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span id="playerFlag" style="font-size:28px"></span>
+        <div><div id="playerName" style="font-size:14px;font-weight:700;color:#fff"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--blue);letter-spacing:1px">YOUR NATION</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div style="background:var(--bg3);padding:8px;border-radius:6px;border:1px solid var(--border);text-align:center">
+          <div id="warheadCount" style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--red)">0</div>
+          <div style="font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-top:2px">Warheads</div>
+        </div>
+        <div style="background:var(--bg3);padding:8px;border-radius:6px;border:1px solid var(--border);text-align:center">
+          <div id="popCount" style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--green)">0</div>
+          <div style="font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-top:2px">Population</div>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-content" style="flex:1;overflow-y:auto;padding:8px">
+      <div id="gameContent">
+        <div id="nationSelectList"></div>
+      </div>
+      <div id="targetQueue" style="display:none;padding:4px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent2);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span style="width:3px;height:10px;background:var(--accent);border-radius:2px;display:inline-block"></span>TARGET QUEUE</div>
+        <div id="targetList"></div>
+        <button id="launchBtn" onclick="launchMissiles()" style="display:none;width:100%;margin-top:10px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:1px solid rgba(255,100,100,.3);border-radius:8px;cursor:pointer;transition:all .3s;box-shadow:0 4px 20px rgba(231,76,60,.3)">☢ LAUNCH STRIKE</button>
+      </div>
+      <div id="gameLog" style="display:none;padding:4px;margin-top:8px;border-top:1px solid var(--border)">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Event Log</div>
+        <div id="logEntries" style="font-size:10px;color:var(--text2);line-height:1.6"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
+<div class="tooltip" id="tooltip"></div>
+<div class="country-tooltip" id="countryTooltip"></div>
+<div id="flashOverlay" style="position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9999;transition:opacity .1s"></div>
+
+<script>
+// ─── Nuclear Nations Data ───
+const NATIONS = [
+  {id:'usa', name:'United States', flag:'🇺🇸', warheads:20, defense:0.85, color:'#4488ff',
+   cities:[{name:'New York',lat:40.7,lng:-74.0,pop:8300000},{name:'Los Angeles',lat:34.1,lng:-118.2,pop:3900000},{name:'Chicago',lat:41.9,lng:-87.6,pop:2700000},{name:'Houston',lat:29.8,lng:-95.4,pop:2300000},{name:'Washington DC',lat:38.9,lng:-77.0,pop:700000}]},
+  {id:'russia', name:'Russia', flag:'🇷🇺', warheads:24, defense:0.70, color:'#cc3333',
+   cities:[{name:'Moscow',lat:55.8,lng:37.6,pop:12600000},{name:'St Petersburg',lat:59.9,lng:30.3,pop:5400000},{name:'Novosibirsk',lat:55.0,lng:82.9,pop:1600000},{name:'Yekaterinburg',lat:56.8,lng:60.6,pop:1500000}]},
+  {id:'china', name:'China', flag:'🇨🇳', warheads:18, defense:0.65, color:'#ee4444',
+   cities:[{name:'Beijing',lat:39.9,lng:116.4,pop:21500000},{name:'Shanghai',lat:31.2,lng:121.5,pop:24300000},{name:'Guangzhou',lat:23.1,lng:113.3,pop:15300000},{name:'Shenzhen',lat:22.5,lng:114.1,pop:12500000}]},
+  {id:'uk', name:'United Kingdom', flag:'🇬🇧', warheads:8, defense:0.75, color:'#3366cc',
+   cities:[{name:'London',lat:51.5,lng:-0.1,pop:9000000},{name:'Birmingham',lat:52.5,lng:-1.9,pop:1100000},{name:'Manchester',lat:53.5,lng:-2.2,pop:550000}]},
+  {id:'france', name:'France', flag:'🇫🇷', warheads:10, defense:0.72, color:'#2255bb',
+   cities:[{name:'Paris',lat:48.9,lng:2.3,pop:2200000},{name:'Marseille',lat:43.3,lng:5.4,pop:870000},{name:'Lyon',lat:45.8,lng:4.8,pop:520000}]},
+  {id:'india', name:'India', flag:'🇮🇳', warheads:12, defense:0.55, color:'#ff8800',
+   cities:[{name:'Mumbai',lat:19.1,lng:72.9,pop:20700000},{name:'Delhi',lat:28.6,lng:77.2,pop:16800000},{name:'Bangalore',lat:12.97,lng:77.6,pop:8400000},{name:'Chennai',lat:13.1,lng:80.3,pop:4600000}]},
+  {id:'pakistan', name:'Pakistan', flag:'🇵🇰', warheads:12, defense:0.45, color:'#33aa44',
+   cities:[{name:'Karachi',lat:24.9,lng:67.1,pop:14900000},{name:'Lahore',lat:31.6,lng:74.4,pop:11100000},{name:'Islamabad',lat:33.7,lng:73.1,pop:1100000}]},
+  {id:'israel', name:'Israel', flag:'🇮🇱', warheads:6, defense:0.90, color:'#4499ee',
+   cities:[{name:'Tel Aviv',lat:32.1,lng:34.8,pop:460000},{name:'Jerusalem',lat:31.8,lng:35.2,pop:940000},{name:'Haifa',lat:32.8,lng:35.0,pop:280000}]},
+  {id:'nkorea', name:'North Korea', flag:'🇰🇵', warheads:8, defense:0.35, color:'#aa2222',
+   cities:[{name:'Pyongyang',lat:39.0,lng:125.8,pop:2870000},{name:'Hamhung',lat:39.9,lng:127.5,pop:770000}]},
+  {id:'iran', name:'Iran', flag:'🇮🇷', warheads:4, defense:0.40, color:'#44aa66',
+   cities:[{name:'Tehran',lat:35.7,lng:51.4,pop:8700000},{name:'Isfahan',lat:32.7,lng:51.7,pop:2000000},{name:'Mashhad',lat:36.3,lng:59.6,pop:3000000}]}
+];
+
+// ─── Game State ───
+let gamePhase = 'SELECT_NATION'; // SELECT_NATION → PLAYING → LAUNCHING → AI_TURN → GAME_OVER
+let playerNation = null;
+let aiNations = [];
+let targetQueue = []; // [{nationId, cityIdx}]
+let turnNumber = 0;
+let totalKills = 0;
+let gameLog = [];
+let missileFlights = []; // active missile animations
+let explosions = []; // active explosion VFX
+let craterMarks = []; // permanent impact marks
+
+// Keep a mutable copy of nations for game state
+let liveNations = [];
+
+// Tracker compat stubs (used by globe infra)
+const CONFLICTS = [];
+let autoRotate = true;
+let showArcs = false;
+let showHeat = false;
+let activeConflict = null;
+
+// ─── Country Names (ISO 3166-1 numeric → name) ───
+const COUNTRY_NAMES = {
+  '004':'Afghanistan','008':'Albania','012':'Algeria','016':'American Samoa','020':'Andorra',
+  '024':'Angola','028':'Antigua and Barbuda','032':'Argentina','036':'Australia','040':'Austria',
+  '050':'Bangladesh','051':'Armenia','056':'Belgium','064':'Bhutan','068':'Bolivia',
+  '070':'Bosnia and Herzegovina','072':'Botswana','076':'Brazil','084':'Belize','090':'Solomon Islands',
+  '096':'Brunei','100':'Bulgaria','104':'Myanmar','108':'Burundi','112':'Belarus',
+  '116':'Cambodia','120':'Cameroon','124':'Canada','140':'Central African Republic','144':'Sri Lanka',
+  '148':'Chad','152':'Chile','156':'China','158':'Taiwan','170':'Colombia',
+  '174':'Comoros','178':'Congo','180':'DR Congo','188':'Costa Rica','191':'Croatia',
+  '192':'Cuba','196':'Cyprus','203':'Czech Republic','204':'Benin','208':'Denmark',
+  '214':'Dominican Republic','218':'Ecuador','818':'Egypt','222':'El Salvador','226':'Equatorial Guinea',
+  '231':'Ethiopia','232':'Eritrea','233':'Estonia','242':'Fiji','246':'Finland',
+  '250':'France','266':'Gabon','268':'Georgia','276':'Germany','288':'Ghana',
+  '300':'Greece','320':'Guatemala','324':'Guinea','328':'Guyana','332':'Haiti',
+  '340':'Honduras','348':'Hungary','352':'Iceland','356':'India','360':'Indonesia',
+  '364':'Iran','368':'Iraq','372':'Ireland','376':'Israel','380':'Italy',
+  '384':'Ivory Coast','388':'Jamaica','392':'Japan','400':'Jordan','398':'Kazakhstan',
+  '404':'Kenya','408':'North Korea','410':'South Korea','414':'Kuwait','417':'Kyrgyzstan',
+  '418':'Laos','422':'Lebanon','426':'Lesotho','428':'Latvia','430':'Liberia',
+  '434':'Libya','440':'Lithuania','442':'Luxembourg','450':'Madagascar','454':'Malawi',
+  '458':'Malaysia','462':'Maldives','466':'Mali','470':'Malta','478':'Mauritania',
+  '484':'Mexico','496':'Mongolia','498':'Moldova','504':'Morocco','508':'Mozambique',
+  '512':'Oman','516':'Namibia','524':'Nepal','528':'Netherlands','540':'New Caledonia',
+  '548':'Vanuatu','554':'New Zealand','558':'Nicaragua','562':'Niger','566':'Nigeria',
+  '578':'Norway','586':'Pakistan','591':'Panama','598':'Papua New Guinea','600':'Paraguay',
+  '604':'Peru','608':'Philippines','616':'Poland','620':'Portugal','630':'Puerto Rico',
+  '634':'Qatar','642':'Romania','643':'Russia','646':'Rwanda','682':'Saudi Arabia',
+  '686':'Senegal','688':'Serbia','694':'Sierra Leone','702':'Singapore','703':'Slovakia',
+  '704':'Vietnam','705':'Slovenia','706':'Somalia','710':'South Africa','716':'Zimbabwe',
+  '724':'Spain','728':'South Sudan','729':'Sudan','740':'Suriname','748':'Eswatini',
+  '752':'Sweden','756':'Switzerland','760':'Syria','762':'Tajikistan','764':'Thailand',
+  '768':'Togo','780':'Trinidad and Tobago','784':'United Arab Emirates','788':'Tunisia',
+  '792':'Turkey','795':'Turkmenistan','800':'Uganda','804':'Ukraine','826':'United Kingdom',
+  '834':'Tanzania','840':'United States','858':'Uruguay','860':'Uzbekistan','862':'Venezuela',
+  '887':'Yemen','894':'Zambia'
+};
+
+// ─── Helpers ───
+function formatNum(n){
+  if(n>=1e6)return (n/1e6).toFixed(1)+"M";
+  if(n>=1e3)return Math.round(n/1e3)+"K";
+  return n.toString();
+}
+function intensityColor(i){return{war:"#f85149",high:"#d29922",medium:"#e3b341",tension:"#58a6ff"}[i]}
+
+// ─── THREE.JS Globe ───
+let scene, camera, renderer, globeGroup, globeMesh, atmosMesh;
+let clock, raycaster, mouse2D = new THREE.Vector2(-999,-999);
+let markerObjects = [];
+let arcObjects = [];
+let heatObjects = [];
+let borderLines = []; // 3D vector country border lines
+let countryFills = []; // 3D vector country polygon meshes
+let graticuleLines = []; // vector graticule grid
+let conflictZones = []; // vector conflict region outlines
+let labelSprites = []; // text labels that appear on zoom
+let currentLOD = '50m'; // current level of detail
+let topoWorld50m = null; // cached topojson data
+let topoWorld110m = null;
+let hoveredMarker = null;
+const globeRadius = 1;
+
+// Pre-allocated vectors for animate loop (avoid per-frame GC pressure)
+let _tempPos, _tempViewDir, _tempNormal;
+
+// ─── Rotation state using SPHERICAL coords ───
+let rotLon = -110, rotLat = 20;
+let targetLon = -110, targetLat = 20;
+let targetDist = 2.8, currentDist = 2.8;
+let isAnimatingTo = false;
+let animProgress = 0;
+let animStartLon, animStartLat, animStartDist;
+let animEndLon, animEndLat, animEndDist;
+
+// ─── Inertia state ───
+let velocityLon = 0, velocityLat = 0;
+let lastDragTime = 0;
+let lastDragDx = 0, lastDragDy = 0;
+const INERTIA_DAMPING = 0.94;   // friction per frame
+const INERTIA_MIN = 0.01;       // stop threshold
+let hasInertia = false;
+
+// ─── Zoom velocity ───
+let zoomVelocity = 0;
+const ZOOM_DAMPING = 0.85;
+
+function latLngToVec3(lat, lng, r){
+  const phi = (90 - lat) * Math.PI / 180;
+  const theta = (lng + 180) * Math.PI / 180;
+  return new THREE.Vector3(
+    -r * Math.sin(phi) * Math.cos(theta),
+     r * Math.cos(phi),
+     r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function initGlobe(){
+  const container = document.getElementById('globeArea');
+  const canvas = document.getElementById('globeCanvas');
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 100);
+  camera.position.set(0, 0, currentDist);
+
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x070a0f, 1);
+
+  raycaster = new THREE.Raycaster();
+  clock = new THREE.Clock();
+  _tempPos = new THREE.Vector3();
+  _tempViewDir = new THREE.Vector3();
+  _tempNormal = new THREE.Vector3();
+
+  // Stars
+  const starsGeo = new THREE.BufferGeometry();
+  const starPos = new Float32Array(4000 * 3);
+  for(let i = 0; i < 4000; i++){
+    const r = 15 + Math.random() * 35;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    starPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+    starPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    starPos[i*3+2] = r * Math.cos(phi);
+  }
+  starsGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({color:0x8899bb, size:0.03, sizeAttenuation:true, transparent:true, opacity:0.6})));
+
+  // Globe group (holds globe mesh + markers)
+  globeGroup = new THREE.Group();
+  scene.add(globeGroup);
+
+  // Globe mesh — start with dark placeholder, textures load async
+  const globeGeo = new THREE.SphereGeometry(globeRadius, 128, 64);
+  const globeMat = new THREE.MeshPhongMaterial({color:0x1a2a3a, emissive:0x0a1018, specular:0x222244, shininess:15});
+  globeMesh = new THREE.Mesh(globeGeo, globeMat);
+  globeGroup.add(globeMesh);
+
+  // Load NASA Blue Marble earth texture
+  loadEarthTextures();
+
+  // Atmosphere
+  const atmosGeo = new THREE.SphereGeometry(globeRadius * 1.018, 64, 32);
+  const atmosMat = new THREE.ShaderMaterial({
+    vertexShader: `varying vec3 vNormal; void main(){ vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vNormal; void main(){ float i = pow(0.65 - dot(vNormal, vec3(0,0,1.0)), 2.5); gl_FragColor = vec4(0.3, 0.45, 1.0, 1.0) * i * 0.5; }`,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    transparent: true
+  });
+  atmosMesh = new THREE.Mesh(atmosGeo, atmosMat);
+  scene.add(atmosMesh);
+
+  // Lighting — brighter to show satellite texture detail
+  scene.add(new THREE.AmbientLight(0x889aaa, 1.0));
+  const dl = new THREE.DirectionalLight(0xddeeff, 1.1);
+  dl.position.set(5, 3, 5);
+  scene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0x556688, 0.5);
+  dl2.position.set(-3, -2, -3);
+  scene.add(dl2);
+
+  // Load countries
+  loadCountries();
+
+  // Events — both left and right click drag
+  const cv = canvas;
+  cv.addEventListener('pointerdown', onPointerDown);
+  cv.addEventListener('pointermove', onPointerMove);
+  cv.addEventListener('pointerup', onPointerUp);
+  cv.addEventListener('pointerleave', onPointerUp);
+  cv.addEventListener('wheel', onWheel, {passive:false});
+  cv.addEventListener('dblclick', onDblClick);
+  cv.addEventListener('contextmenu', e => e.preventDefault()); // prevent right-click menu
+
+  // Apply initial rotation
+  applyRotation();
+  animate();
+}
+
+function applyRotation(){
+  // Convert lon/lat to Euler rotation of the globe group
+  const lonRad = rotLon * Math.PI / 180;
+  const latRad = rotLat * Math.PI / 180;
+  globeGroup.rotation.set(latRad, lonRad, 0, 'YXZ');
+}
+
+// ─── Load Earth Textures (NASA Blue Marble + bump — applied directly, no canvas compositing) ───
+function loadEarthTextures(){
+  const loader = new THREE.TextureLoader();
+  const earthTexUrl = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-blue-marble.jpg';
+  const bumpTexUrl = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-topology.png';
+  const waterTexUrl = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-water.png';
+
+  let earthTex = null, bumpTex = null, specTex = null;
+  function tryApply(){
+    if(!earthTex) return;
+    const matOpts = {
+      map: earthTex,
+      specular: new THREE.Color(0x444466),
+      shininess: 22,
+      emissive: new THREE.Color(0x0a0e14),
+      emissiveIntensity: 0.4
+    };
+    if(bumpTex){ matOpts.bumpMap = bumpTex; matOpts.bumpScale = 0.02; }
+    if(specTex){ matOpts.specularMap = specTex; } // water reflections
+    globeMesh.material = new THREE.MeshPhongMaterial(matOpts);
+    globeMesh.material.needsUpdate = true;
+  }
+
+  loader.load(earthTexUrl, (tex) => {
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    earthTex = tex;
+    tryApply();
+  });
+  loader.load(bumpTexUrl, (tex) => { bumpTex = tex; tryApply(); });
+  loader.load(waterTexUrl, (tex) => { specTex = tex; tryApply(); });
+}
+
+// ─── Load & Draw Countries as 3D Vector Graphics ───
+// Full vector pipeline: polygon fills + border lines + graticules + labels
+// Everything is true 3D geometry → infinitely sharp at any zoom level
+
+function loadCountries(){
+  // Load both resolutions in parallel for LOD switching
+  const load50 = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json")
+    .then(r => { if(!r.ok) throw new Error(); return r.json(); })
+    .then(w => { topoWorld50m = w; return w; })
+    .catch(() => null);
+
+  const load110 = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+    .then(r => r.json())
+    .then(w => { topoWorld110m = w; return w; })
+    .catch(() => null);
+
+  Promise.all([load50, load110]).then(([w50, w110]) => {
+    const world = w50 || w110;
+    if(!world) { createMarkers(); return; }
+    processTopoJSON(world);
+  });
+}
+
+function processTopoJSON(world){
+  const geojson = topojson.feature(world, world.objects.countries);
+  const bordersMesh = topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
+  const coastlineMesh = topojson.mesh(world, world.objects.countries, (a, b) => a === b);
+
+  drawVectorCountryFills(geojson);
+  drawVectorBorders(bordersMesh, coastlineMesh);
+  drawVectorGraticule();
+  createMarkers(); // also calls createConflictZones() and createHeatGlow()
+}
+
+// ─── Vector Country Polygon Fills ───
+// Triangulates each country polygon and renders as a mesh on the globe surface
+// Result: crisp filled countries at ANY zoom level (no raster texture needed)
+
+function drawVectorCountryFills(geojson){
+  countryFills.forEach(m => { globeGroup.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  countryFills = [];
+
+  const fillR = globeRadius * 1.0002;
+  const landColor = new THREE.Color('#1a2a3a');
+  const hoverColor = new THREE.Color('#182436');
+
+  geojson.features.forEach(feature => {
+    const coords = feature.geometry.type === 'Polygon'
+      ? [feature.geometry.coordinates]
+      : feature.geometry.type === 'MultiPolygon'
+        ? feature.geometry.coordinates : [];
+
+    coords.forEach(polygon => {
+      const ring = polygon[0]; // outer ring
+      if(ring.length < 4) return;
+
+      // Convert ring to 3D points on sphere
+      const pts3d = ring.map(c => latLngToVec3(c[1], c[0], fillR));
+
+      // Fan triangulation from first vertex (works for convex-ish polygons on globe)
+      const vertices = [];
+      for(let i = 1; i < pts3d.length - 2; i++){
+        vertices.push(pts3d[0].x, pts3d[0].y, pts3d[0].z);
+        vertices.push(pts3d[i].x, pts3d[i].y, pts3d[i].z);
+        vertices.push(pts3d[i+1].x, pts3d[i+1].y, pts3d[i+1].z);
+      }
+      if(vertices.length === 0) return;
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshBasicMaterial({
+        color: landColor,
+        transparent: true,
+        opacity: 0.08,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData.countryId = feature.id || feature.properties?.name || 'unknown';
+      mesh.userData.countryName = COUNTRY_NAMES[feature.id] || feature.properties?.name || '';
+      globeGroup.add(mesh);
+      countryFills.push(mesh);
+    });
+  });
+}
+
+// ─── Vector Border Lines ───
+function drawVectorBorders(bordersMesh, coastlineMesh){
+  borderLines.forEach(l => { globeGroup.remove(l); l.geometry.dispose(); l.material.dispose(); });
+  borderLines = [];
+
+  const borderR = globeRadius * 1.0008;
+  const coastR = globeRadius * 1.0006;
+
+  function geoToLines(geoMesh, radius, color, opacity){
+    const geometries = geoMesh.type === 'MultiLineString'
+      ? geoMesh.coordinates : [geoMesh.coordinates];
+
+    geometries.forEach(lineCoords => {
+      const points = [];
+      for(let i = 0; i < lineCoords.length; i++){
+        const [lng, lat] = lineCoords[i];
+        points.push(latLngToVec3(lat, lng, radius));
+      }
+      if(points.length < 2) return;
+
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = new THREE.LineBasicMaterial({
+        color: new THREE.Color(color),
+        transparent: true,
+        opacity: opacity
+      });
+      const line = new THREE.Line(geo, mat);
+      line.userData.baseOpacity = opacity;
+      globeGroup.add(line);
+      borderLines.push(line);
+    });
+  }
+
+  geoToLines(coastlineMesh, coastR, '#3a5a7a', 0.55);
+  geoToLines(bordersMesh, borderR, '#2a4565', 0.35);
+}
+
+// ─── Vector Graticule Grid ───
+// Lat/lon lines rendered as 3D geometry — sharp at any zoom
+function drawVectorGraticule(){
+  graticuleLines.forEach(l => { globeGroup.remove(l); l.geometry.dispose(); l.material.dispose(); });
+  graticuleLines = [];
+
+  const gridR = globeRadius * 1.0001;
+  const color = new THREE.Color('#1a2535');
+  const step = 30; // degrees between lines
+
+  // Latitude lines (circles at fixed lat)
+  for(let lat = -60; lat <= 60; lat += step){
+    const pts = [];
+    for(let lng = -180; lng <= 180; lng += 3){
+      pts.push(latLngToVec3(lat, lng, gridR));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({color, transparent:true, opacity:0.15});
+    const line = new THREE.Line(geo, mat);
+    line.userData.baseOpacity = 0.15;
+    globeGroup.add(line);
+    graticuleLines.push(line);
+  }
+
+  // Longitude lines (great circle arcs at fixed lng)
+  for(let lng = -180; lng < 180; lng += step){
+    const pts = [];
+    for(let lat = -90; lat <= 90; lat += 3){
+      pts.push(latLngToVec3(lat, lng, gridR));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({color, transparent:true, opacity:0.15});
+    const line = new THREE.Line(geo, mat);
+    line.userData.baseOpacity = 0.15;
+    globeGroup.add(line);
+    graticuleLines.push(line);
+  }
+
+  // Equator + Prime Meridian (brighter)
+  [0].forEach(lat => {
+    const pts = [];
+    for(let lng = -180; lng <= 180; lng += 2){
+      pts.push(latLngToVec3(lat, lng, gridR * 1.0001));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({color: new THREE.Color('#2a3d55'), transparent:true, opacity:0.3});
+    const line = new THREE.Line(geo, mat);
+    line.userData.baseOpacity = 0.3;
+    globeGroup.add(line);
+    graticuleLines.push(line);
+  });
+}
+
+// ─── Vector Conflict Zone Outlines ───
+// Draws shaded polygon regions around conflict areas (not just dots)
+const CONFLICT_ZONES = [
+  {id:1, name:'Eastern Ukraine', points:[[44.4,52.4],[30.2,52.0],[30.5,46.5],[40.2,46.2],[44.4,52.4]], intensity:'war'},
+  {id:2, name:'Gaza Strip', points:[[34.2,31.6],[34.6,31.6],[34.6,31.2],[34.2,31.2],[34.2,31.6]], intensity:'war'},
+  {id:3, name:'Sudan', points:[[22.0,23.0],[38.5,22.0],[38.5,8.5],[24.0,3.5],[22.0,23.0]], intensity:'war'},
+  {id:4, name:'Myanmar', points:[[92.0,28.5],[101.5,28.0],[101.0,10.0],[92.5,10.5],[92.0,28.5]], intensity:'war'},
+  {id:7, name:'Eastern DRC', points:[[26.5,4.0],[31.0,4.0],[31.0,-5.5],[26.5,-5.5],[26.5,4.0]], intensity:'war'},
+  {id:5, name:'Yemen', points:[[42.5,19.0],[54.0,18.0],[54.0,12.0],[42.5,12.5],[42.5,19.0]], intensity:'high'},
+  {id:6, name:'Syria', points:[[35.5,37.5],[42.5,37.5],[42.0,32.0],[35.5,32.5],[35.5,37.5]], intensity:'high'},
+  {id:9, name:'Sahel', points:[[-18.0,24.0],[16.0,24.0],[16.0,10.0],[-18.0,10.0],[-18.0,24.0]], intensity:'high'},
+];
+
+function createConflictZones(){
+  conflictZones.forEach(z => { globeGroup.remove(z); if(z.geometry) z.geometry.dispose(); if(z.material) z.material.dispose(); });
+  conflictZones = [];
+
+  const zoneR = globeRadius * 1.0003;
+
+  CONFLICT_ZONES.forEach(zone => {
+    const color = new THREE.Color(intensityColor(zone.intensity));
+    const pts = zone.points.map(p => latLngToVec3(p[1], p[0], zoneR));
+
+    // Fill
+    const vertices = [];
+    for(let i = 1; i < pts.length - 2; i++){
+      vertices.push(pts[0].x, pts[0].y, pts[0].z);
+      vertices.push(pts[i].x, pts[i].y, pts[i].z);
+      vertices.push(pts[i+1].x, pts[i+1].y, pts[i+1].z);
+    }
+    if(vertices.length > 0){
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      const mat = new THREE.MeshBasicMaterial({
+        color, transparent:true, opacity:0.04, side:THREE.DoubleSide, depthWrite:false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData.baseOpacity = 0.04;
+      globeGroup.add(mesh);
+      conflictZones.push(mesh);
+    }
+
+    // Outline
+    const outlinePts = [...pts, pts[0]]; // close the loop
+    const outlineGeo = new THREE.BufferGeometry().setFromPoints(outlinePts);
+    const outlineMat = new THREE.LineBasicMaterial({
+      color, transparent:true, opacity:0.15
+    });
+    const outline = new THREE.Line(outlineGeo, outlineMat);
+    outline.userData.baseOpacity = 0.15;
+    globeGroup.add(outline);
+    conflictZones.push(outline);
+  });
+}
+
+// ─── Markers (HTML/CSS Overlay) ───
+let htmlMarkerData = []; // holds logic state for html markers
+
+function createMarkers(){
+  const container = document.getElementById('htmlMarkers');
+  container.innerHTML = '';
+  htmlMarkerData = [];
+  const filtered = getFiltered();
+  if(filtered.length === 0) return; // No conflicts in game mode
+  const maxDeaths = Math.max(...CONFLICTS.map(c=>c.deaths), 1);
+
+  filtered.forEach(c => {
+    // Determine visual size based on death toll
+    const sizeScale = 0.6 + 0.6 * Math.log10(Math.max(c.deaths,100)) / Math.log10(maxDeaths);
+    const basePx = 14 * sizeScale;
+    const color = intensityColor(c.intensity);
+
+    const el = document.createElement('div');
+    el.className = 'html-marker';
+    el.style.width = (basePx * 4) + 'px';
+    el.style.height = (basePx * 4) + 'px';
+
+    const core = document.createElement('div');
+    core.className = 'html-marker-core';
+    core.style.width = basePx + 'px';
+    core.style.height = basePx + 'px';
+    core.style.background = color;
+    core.style.boxShadow = `0 0 10px ${color}`;
+
+    const glow = document.createElement('div');
+    glow.className = 'html-marker-glow';
+    glow.style.width = (basePx * 2.2) + 'px';
+    glow.style.height = (basePx * 2.2) + 'px';
+    glow.style.background = `${color}33`; // 20% opacity hex
+
+    const ring = document.createElement('div');
+    ring.className = 'html-marker-ring';
+    ring.style.width = (basePx * 1.5) + 'px';
+    ring.style.height = (basePx * 1.5) + 'px';
+    ring.style.borderColor = color;
+
+    el.appendChild(glow);
+    el.appendChild(ring);
+    el.appendChild(core);
+
+    if(c.nuclearRisk){
+      const nuke = document.createElement('div');
+      nuke.className = 'html-marker-nuke';
+      nuke.style.width = (basePx * 3.0) + 'px';
+      nuke.style.height = (basePx * 3.0) + 'px';
+      el.appendChild(nuke);
+    }
+
+    // Interactions
+    el.addEventListener('pointerenter', () => {
+      if(!pointerDown) updateTooltip(c);
+    });
+    el.addEventListener('pointerleave', () => {
+      updateTooltip(null);
+    });
+    el.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); // prevent globe drag
+    });
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectConflict(c.id);
+    });
+
+    container.appendChild(el);
+
+    // 3D true position on the globe surface
+    const pos3d = latLngToVec3(c.lat, c.lng, globeRadius * 1.01);
+
+    htmlMarkerData.push({
+      conflict: c,
+      el: el,
+      ring: ring,
+      glow: glow,
+      pos3d: pos3d,
+      screenPos: new THREE.Vector2(), // true projected pos
+      repelPos: new THREE.Vector2(),  // physical pushed pos
+      basePx: basePx,
+      visible: true
+    });
+  });
+
+  if(showHeat) createHeatGlow();
+  createConflictZones();
+}
+
+// ─── Connection Arcs ───
+
+function createArcs(){
+  arcObjects.forEach(a => { globeGroup.remove(a); a.geometry.dispose(); a.material.dispose(); });
+  arcObjects = [];
+  if(!showArcs) return;
+
+  const filtered = getFiltered();
+  const filteredIds = new Set(filtered.map(c=>c.id));
+  const drawn = new Set();
+
+  filtered.forEach(c => {
+    if(!c.related) return;
+    c.related.forEach(rid => {
+      if(!filteredIds.has(rid)) return;
+      const key = [Math.min(c.id,rid), Math.max(c.id,rid)].join('-');
+      if(drawn.has(key)) return;
+      drawn.add(key);
+
+      const other = CONFLICTS.find(x=>x.id===rid);
+      if(!other) return;
+
+      const p1 = latLngToVec3(c.lat, c.lng, globeRadius * 1.002);
+      const p2 = latLngToVec3(other.lat, other.lng, globeRadius * 1.002);
+
+      // Create curved arc via midpoint pushed outward
+      const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+      const dist = p1.distanceTo(p2);
+      const height = globeRadius + dist * 0.3;
+      mid.normalize().multiplyScalar(height);
+
+      const curve = new THREE.QuadraticBezierCurve3(p1, mid, p2);
+      const points = curve.getPoints(40);
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = new THREE.LineBasicMaterial({color:0x7c72ff, transparent:true, opacity:0.25, linewidth:1});
+      const line = new THREE.Line(geo, mat);
+      globeGroup.add(line);
+      arcObjects.push(line);
+    });
+  });
+}
+
+// ─── Heat Glow ───
+function createHeatGlow(){
+  heatObjects.forEach(h => { globeGroup.remove(h); h.geometry.dispose(); h.material.dispose(); });
+  heatObjects = [];
+  if(!showHeat) return;
+
+  const filtered = getFiltered();
+  filtered.forEach(c => {
+    const pos = latLngToVec3(c.lat, c.lng, globeRadius * 1.001);
+    const color = new THREE.Color(intensityColor(c.intensity));
+    // Size based on displaced (humanitarian impact)
+    const heatSize = 0.04 + Math.min(c.displaced / 3000000, 1) * 0.08;
+    const geo = new THREE.CircleGeometry(heatSize, 32);
+    const mat = new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.08, side:THREE.DoubleSide});
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    mesh.lookAt(0,0,0);
+    globeGroup.add(mesh);
+    heatObjects.push(mesh);
+  });
+}
+
+// ─── Pointer Controls with Inertia & Right-Click Support ───
+let pointerDown = false, pointerX = 0, pointerY = 0;
+let dragDist = 0;
+let pinchDist = 0;
+const pointers = new Map();
+let activeButton = -1; // track which mouse button is active
+
+function onPointerDown(e){
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(pointers.size === 1){
+    pointerDown = true;
+    dragDist = 0;
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    activeButton = e.button; // 0=left, 2=right
+    lastDragDx = 0;
+    lastDragDy = 0;
+    lastDragTime = performance.now();
+    // Kill any existing inertia
+    hasInertia = false;
+    velocityLon = 0;
+    velocityLat = 0;
+    // Stop fly-to animation on user interaction
+    isAnimatingTo = false;
+    autoRotate = false;
+    updateAutoRotateBtn();
+    document.getElementById('globeArea').classList.add('dragging');
+  } else if(pointers.size === 2){
+    const pts = [...pointers.values()];
+    pinchDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+  }
+  e.target.setPointerCapture(e.pointerId);
+}
+
+function onPointerMove(e){
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+  if(pointers.size === 2){
+    const pts = [...pointers.values()];
+    const newDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    targetDist -= (newDist - pinchDist) * 0.005;
+    targetDist = Math.max(1.5, Math.min(6, targetDist));
+    pinchDist = newDist;
+    return;
+  }
+
+  // Both left-click (button 0) and right-click (button 2) drag to rotate
+  if(pointerDown && pointers.size === 1 && (activeButton === 0 || activeButton === 2)){
+    const dx = e.clientX - pointerX;
+    const dy = e.clientY - pointerY;
+    dragDist += Math.abs(dx) + Math.abs(dy);
+
+    // Sensitivity — slightly higher for trackpad feel
+    const sensitivity = 0.35;
+    targetLon += dx * sensitivity;
+    targetLat += dy * sensitivity;
+    targetLat = Math.max(-80, Math.min(80, targetLat));
+
+    // Track velocity for inertia
+    const now = performance.now();
+    const dt = now - lastDragTime;
+    if(dt > 0){
+      lastDragDx = dx;
+      lastDragDy = dy;
+      lastDragTime = now;
+    }
+
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+  }
+}
+
+function onPointerUp(e){
+  const wasDrag = dragDist > 8;
+  pointers.delete(e.pointerId);
+
+  if(pointers.size === 0){
+    pointerDown = false;
+    document.getElementById('globeArea').classList.remove('dragging');
+
+    // Apply inertia from last drag movement
+    if(wasDrag){
+      const timeSinceLast = performance.now() - lastDragTime;
+      if(timeSinceLast < 80){ // only if drag was recent (not a pause-then-release)
+        velocityLon = lastDragDx * 0.35;
+        velocityLat = lastDragDy * 0.35;
+        hasInertia = true;
+      }
+    }
+  }
+
+  // Clicked (not dragged) — check for country click
+  if(!wasDrag && pointers.size === 0 && (activeButton === 0)){
+    handleCountryClick(e.clientX, e.clientY);
+    closeDetail();
+  }
+  activeButton = -1;
+}
+
+function onWheel(e){
+  e.preventDefault();
+  // deltaMode-aware zoom: 0=pixel (trackpad), 1=line (mouse wheel)
+  let delta = e.deltaY;
+  if(e.deltaMode === 1) delta *= 16; // line mode → multiply for consistent feel
+  // Add to zoom velocity for smooth momentum zoom
+  zoomVelocity += delta * 0.0008;
+}
+
+function onDblClick(e){
+  targetDist = Math.max(1.5, targetDist - 0.5);
+}
+
+function updateTooltip(c){
+  const tooltip = document.getElementById('tooltip');
+  if(c){
+    if(hoveredMarker !== c.id){
+      hoveredMarker = c.id;
+      tooltip.innerHTML = `
+        <div class="tt-name"><div class="tt-dot" style="background:${intensityColor(c.intensity)};box-shadow:0 0 6px ${intensityColor(c.intensity)}44"></div>${c.name}${c.nuclearRisk?'<span class="nuke-badge"><span class="nuke-icon"></span>Nuclear</span>':''}</div>
+        <div class="tt-region">${c.region} &middot; ${c.intensity}</div>
+        <div class="tt-summary">${c.summary.substring(0,140)}${c.summary.length>140?'...':''}</div>
+        <div class="tt-stats">
+          <div class="tt-stat">Deaths: <span>${formatNum(c.deaths)}</span></div>
+          <div class="tt-stat">Displaced: <span>${formatNum(c.displaced)}</span></div>
+        </div>`;
+    }
+    const htmlObj = htmlMarkerData.find(m => m.conflict.id === c.id);
+    if(htmlObj){
+      const ttW = 280;
+      let left = htmlObj.repelPos.x + 24;
+      let top = htmlObj.repelPos.y - 40;
+      if(left + ttW > window.innerWidth) left = htmlObj.repelPos.x - ttW - 24;
+      if(top + 160 > window.innerHeight) top = window.innerHeight - 170;
+      if(top < 10) top = 10;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+      tooltip.classList.add('visible');
+    }
+  } else {
+    if(hoveredMarker !== null){
+      hoveredMarker = null;
+      tooltip.classList.remove('visible');
+    }
+  }
+}
+
+// ─── Smooth Fly-To (shortest path, no wild spinning) ───
+function flyToConflict(c){
+  // Target: rotate globe so conflict faces camera
+  // The conflict is at (lat, lng). To face camera, globe must rotate so that
+  // its lon rotation = -lng and lat rotation = lat
+  animStartLon = rotLon;
+  animStartLat = rotLat;
+  animStartDist = currentDist;
+  animEndLon = -90 - c.lng;
+  animEndLat = c.lat;
+  animEndDist = 2.0;
+
+  // Normalize longitude difference to [-180, 180] for shortest path
+  let dLon = animEndLon - animStartLon;
+  while(dLon > 180) dLon -= 360;
+  while(dLon < -180) dLon += 360;
+  animEndLon = animStartLon + dLon;
+
+  animProgress = 0;
+  isAnimatingTo = true;
+  autoRotate = false;
+  updateAutoRotateBtn();
+}
+
+// Ease in-out cubic
+function easeInOutCubic(t){
+  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+}
+
+// ─── Animation Loop ───
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // Fly-to animation
+  if(isAnimatingTo){
+    animProgress = Math.min(1, animProgress + 0.02);
+    const ease = easeInOutCubic(animProgress);
+    rotLon = animStartLon + (animEndLon - animStartLon) * ease;
+    rotLat = animStartLat + (animEndLat - animStartLat) * ease;
+    currentDist = animStartDist + (animEndDist - animStartDist) * ease;
+    targetLon = rotLon;
+    targetLat = rotLat;
+    targetDist = currentDist;
+    if(animProgress >= 1) isAnimatingTo = false;
+  } else {
+    // Apply inertia momentum
+    if(hasInertia && !pointerDown){
+      targetLon += velocityLon;
+      targetLat += velocityLat;
+      targetLat = Math.max(-80, Math.min(80, targetLat));
+      velocityLon *= INERTIA_DAMPING;
+      velocityLat *= INERTIA_DAMPING;
+      if(Math.abs(velocityLon) < INERTIA_MIN && Math.abs(velocityLat) < INERTIA_MIN){
+        hasInertia = false;
+        velocityLon = 0;
+        velocityLat = 0;
+      }
+    }
+
+    // Apply zoom momentum
+    if(Math.abs(zoomVelocity) > 0.0005){
+      targetDist += zoomVelocity;
+      targetDist = Math.max(1.5, Math.min(6, targetDist));
+      zoomVelocity *= ZOOM_DAMPING;
+    } else {
+      zoomVelocity = 0;
+    }
+
+    // Auto-rotate
+    if(autoRotate && !hasInertia) targetLon -= 0.06;
+
+    // Smooth interpolation
+    rotLon += (targetLon - rotLon) * 0.12;
+    rotLat += (targetLat - rotLat) * 0.12;
+    currentDist += (targetDist - currentDist) * 0.12;
+  }
+
+  // Apply rotation
+  applyRotation();
+  camera.position.z = currentDist;
+  
+  // Need view matrix for projection
+  globeGroup.updateMatrixWorld();
+  const W = renderer.domElement.clientWidth;
+  const H = renderer.domElement.clientHeight;
+  const hw = W / 2;
+  const hh = H / 2;
+
+  // 1. Project 3D positions to 2D screen positions
+  let visibleMarkers = [];
+  htmlMarkerData.forEach(m => {
+    // Copy vector, apply globe transform (reuse pre-allocated vectors)
+    const pos = _tempPos.copy(m.pos3d).applyMatrix4(globeGroup.matrixWorld);
+
+    // Check if behind globe (dot product of position and camera direction)
+    _tempViewDir.subVectors(camera.position, pos).normalize();
+    _tempNormal.copy(pos).normalize();
+    const isVisible = _tempNormal.dot(_tempViewDir) > 0.1; // 0.1 margin hides slightly before edge
+
+    m.visible = isVisible;
+    if(isVisible){
+      pos.project(camera); // Convert to NDC space (-1 to +1)
+      m.screenPos.set((pos.x * hw) + hw, -(pos.y * hh) + hh);
+      // Initialize repelPos to screenPos every frame
+      m.repelPos.copy(m.screenPos);
+      visibleMarkers.push(m);
+      m.el.classList.remove('hidden');
+    } else {
+      m.el.classList.add('hidden');
+    }
+  });
+
+  // 2. Overlap Prevention (2D Repulsion Physics)
+  const iterations = 3;
+  const minDist = 32; // minimum distance between marker centers
+  for(let i = 0; i < iterations; i++){
+    for(let a = 0; a < visibleMarkers.length; a++){
+      for(let b = a + 1; b < visibleMarkers.length; b++){
+        const m1 = visibleMarkers[a];
+        const m2 = visibleMarkers[b];
+        const dx = m1.repelPos.x - m2.repelPos.x;
+        const dy = m1.repelPos.y - m2.repelPos.y;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 0.1;
+        
+        if(dist < minDist){
+          // They overlap! Push apart along their axis
+          const overlap = minDist - dist;
+          const force = overlap / 2;
+          const pushX = (dx / dist) * force;
+          const pushY = (dy / dist) * force;
+          
+          m1.repelPos.x += pushX;
+          m1.repelPos.y += pushY;
+          m2.repelPos.x -= pushX;
+          m2.repelPos.y -= pushY;
+        }
+      }
+    }
+  }
+
+  // 3. Update DOM positions, animate UI rings, and draw SVG leader lines
+  let svgPaths = '';
+  htmlMarkerData.forEach((m, i) => {
+    if(!m.visible) return;
+
+    // Apply active class if selected
+    m.el.classList.toggle('active', activeConflict === m.conflict.id);
+
+    // Apply HTML DOM positions
+    m.el.style.left = m.repelPos.x + 'px';
+    m.el.style.top = m.repelPos.y + 'px';
+
+    // Animate glow/ring using time
+    const phase = t * 1.5 + i * 0.5;
+    const pulse = (Math.sin(phase) + 1) / 2;
+    const scale = 1 + pulse * 1.5;
+    m.ring.style.transform = `scale(${scale})`;
+    m.ring.style.opacity = 0.6 * (1 - pulse);
+    m.glow.style.opacity = 0.12 + pulse * 0.15;
+
+    // Draw leader line if pushed significantly
+    const moved = m.repelPos.distanceTo(m.screenPos);
+    if(moved > 2){
+      const color = intensityColor(m.conflict.intensity);
+      svgPaths += `<line x1="${m.screenPos.x}" y1="${m.screenPos.y}" x2="${m.repelPos.x}" y2="${m.repelPos.y}" stroke="${color}" stroke-width="1.5" stroke-opacity="0.5" stroke-dasharray="2,2"/>`;
+      // Draw tiny dot at root origin
+      svgPaths += `<circle cx="${m.screenPos.x}" cy="${m.screenPos.y}" r="2" fill="${color}" opacity="0.8"/>`;
+    }
+  });
+
+  const lb = document.getElementById('leaderLines');
+  if(lb.innerHTML !== svgPaths) lb.innerHTML = svgPaths;
+
+  // ─── Zoom-adaptive vector brightness ───
+  // As camera gets closer, borders/graticule/zones get brighter & more detailed
+  const zoomFactor = Math.max(0, Math.min(1, (2.8 - currentDist) / 1.5)); // 0 at far, 1 at close
+
+  // Borders: brighter on zoom
+  borderLines.forEach(l => {
+    const base = l.userData.baseOpacity || 0.4;
+    l.material.opacity = base + zoomFactor * 0.3;
+  });
+
+  // Graticule: more visible on zoom
+  graticuleLines.forEach(l => {
+    const base = l.userData.baseOpacity || 0.15;
+    l.material.opacity = base + zoomFactor * 0.15;
+  });
+
+  // Conflict zones: slightly more visible on zoom
+  conflictZones.forEach(z => {
+    const base = z.userData.baseOpacity || 0.05;
+    if(z.isMesh) z.material.opacity = base + zoomFactor * 0.04;
+    else z.material.opacity = (z.userData.baseOpacity || 0.15) + zoomFactor * 0.15;
+  });
+
+  // Country fills: subtle tint, slightly more visible on zoom
+  countryFills.forEach(f => {
+    f.material.opacity = 0.06 + zoomFactor * 0.06;
+  });
+
+  // Animate heat glow
+  if(showHeat){
+    heatObjects.forEach((h, i) => {
+      const pulse = (Math.sin(t * 0.8 + i * 0.7) + 1) / 2;
+      h.material.opacity = 0.05 + pulse * 0.06;
+    });
+  }
+
+  // Animate arcs
+  if(showArcs){
+    arcObjects.forEach((a, i) => {
+      const pulse = (Math.sin(t * 1.2 + i) + 1) / 2;
+      a.material.opacity = 0.12 + pulse * 0.18;
+    });
+  }
+
+  // ─── Game updates (missiles, explosions, city markers) ───
+  var gdt = 0.016; // ~60fps timestep
+  if(typeof updateMissiles === 'function') updateMissiles(gdt);
+  if(typeof updateExplosions === 'function') updateExplosions(gdt);
+  if(typeof updateExplosionsV3 === 'function') updateExplosionsV3(gdt);
+  if(typeof updateCityMarkerPositions === 'function' && typeof cityMarkerEls !== 'undefined' && cityMarkerEls.length > 0) updateCityMarkerPositions();
+
+  renderer.render(scene, camera);
+}
+
+// ─── Globe UI Controls ───
+function zoomGlobe(dir){
+  targetDist -= dir * 0.4;
+  targetDist = Math.max(1.5, Math.min(6, targetDist));
+}
+function resetGlobe(){
+  isAnimatingTo = false;
+  targetLon = -110; targetLat = 20; targetDist = 2.8;
+  autoRotate = true;
+  updateAutoRotateBtn();
+}
+function toggleAutoRotate(){
+  autoRotate = !autoRotate;
+  updateAutoRotateBtn();
+}
+function updateAutoRotateBtn(){
+  const btn = document.getElementById('autoRotateBtn');
+  btn.classList.toggle('active', autoRotate);
+}
+function toggleArcs(){
+  showArcs = !showArcs;
+  document.getElementById('arcsBtn').classList.toggle('active', showArcs);
+  if(showArcs) createArcs(); else { arcObjects.forEach(a=>{globeGroup.remove(a);a.geometry.dispose();a.material.dispose();}); arcObjects=[]; }
+}
+function toggleHeat(){
+  showHeat = !showHeat;
+  document.getElementById('heatBtn').classList.toggle('active', showHeat);
+  if(showHeat) createHeatGlow(); else { heatObjects.forEach(h=>{globeGroup.remove(h);h.geometry.dispose();h.material.dispose();}); heatObjects=[]; }
+}
+
+// ─── Resize ───
+function handleResize(){
+  const container = document.getElementById('globeArea');
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+}
+window.addEventListener('resize', handleResize);
+
+// ─── Stubs for removed tracker features ───
+function createTerminator(){}
+function escapeHTML(str){ var d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+// ─── handleCountryClick (stub for globe clicks — game mode doesn't use country click) ───
+function handleCountryClick(x, y){}
+
+// ─── toggleSidebar (mobile sidebar toggle) ───
+function toggleSidebar(){
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('mobileOverlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('visible');
+}
+
+// ─── Enhanced Timestamp ───
+function updateTimestampEnhanced(){
+  var now = new Date();
+  var timeStr = now.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  var dateStr = now.toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
+  var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  document.getElementById("timeStamp").innerHTML =
+    '<span style="color:var(--green)">&#9679;</span> LIVE &middot; ' + dateStr + ' &middot; ' + timeStr + ' <span style="opacity:.5">' + tz + '</span>';
+}
+
+// ─── UI: Global Stats ───
+function renderGlobalStats(){
+  if(gamePhase === 'SELECT_NATION'){
+    document.getElementById("globalStats").innerHTML=`
+      <div class="stat"><div class="stat-val info">${NATIONS.length}</div><div class="stat-label">Nations</div></div>
+      <div class="stat"><div class="stat-val danger">${NATIONS.reduce((s,n)=>s+n.warheads,0)}</div><div class="stat-label">Total warheads</div></div>`;
+  } else {
+    const alive = liveNations.filter(n=>n.cities.some(c=>c.pop>0));
+    document.getElementById("globalStats").innerHTML=`
+      <div class="stat"><div class="stat-val warn">T${turnNumber}</div><div class="stat-label">Turn</div></div>
+      <div class="stat"><div class="stat-val info">${alive.length}</div><div class="stat-label">Nations alive</div></div>
+      <div class="stat"><div class="stat-val danger">${formatNum(totalKills)}</div><div class="stat-label">Casualties</div></div>
+      <div class="stat"><div class="stat-val">${targetQueue.length}</div><div class="stat-label">Targets</div></div>`;
+  }
+}
+
+function renderNationSelect(){
+  const el = document.getElementById('nationSelectList');
+  el.innerHTML = NATIONS.map(n => `
+    <div class="conflict-card" onclick="selectNation('${n.id}')" style="cursor:pointer">
+      <div class="cc-top">
+        <span style="font-size:22px">${n.flag}</span>
+        <span class="cc-name">${n.name}</span>
+      </div>
+      <div class="cc-stats" style="gap:16px">
+        <div class="cc-stat">☢ <span>${n.warheads}</span> warheads</div>
+        <div class="cc-stat">🏙 <span>${n.cities.length}</span> cities</div>
+        <div class="cc-stat">🛡 <span>${Math.round(n.defense*100)}%</span> defense</div>
+      </div>
+    </div>`).join('');
+}
+
+function selectNation(id){
+  const nation = NATIONS.find(n => n.id === id);
+  if(!nation) return;
+  liveNations = NATIONS.map(n => JSON.parse(JSON.stringify(n)));
+  aiNations = liveNations.filter(n => n.id !== id);
+  playerNation = liveNations.find(n => n.id === id);
+  gamePhase = 'PLAYING';
+  turnNumber = 1;
+  totalKills = 0;
+  targetQueue = [];
+  gameLog = [];
+  document.getElementById('gamePhaseHeader').innerHTML = '☢ TURN ' + turnNumber + ' — SELECT TARGETS';
+  document.getElementById('gamePhaseHeader').style.color = 'var(--accent2)';
+  document.getElementById('playerInfo').style.display = 'block';
+  document.getElementById('playerFlag').textContent = playerNation.flag;
+  document.getElementById('playerName').textContent = playerNation.name;
+  document.getElementById('targetQueue').style.display = 'block';
+  document.getElementById('gameLog').style.display = 'block';
+  document.getElementById('nationSelectList').style.display = 'none';
+  updatePlayerHUD();
+  renderGlobalStats();
+  addLog('You are ' + playerNation.flag + ' ' + playerNation.name + '. Click enemy cities to target them.');
+  createCityMarkers();
+  autoRotate = false;
+  updateAutoRotateBtn();
+}
+
+function updatePlayerHUD(){
+  document.getElementById('warheadCount').textContent = playerNation.warheads;
+  const totalPop = playerNation.cities.reduce((s,c)=>s+c.pop,0);
+  document.getElementById('popCount').textContent = formatNum(totalPop);
+}
+
+let cityMarkerEls = [];
+let cityMarker3Ds = [];
+function createCityMarkers(){
+  const container = document.getElementById('htmlMarkers');
+  container.innerHTML = '';
+  cityMarkerEls = [];
+  cityMarker3Ds = [];
+  liveNations.forEach(nation => {
+    nation.cities.forEach((city, ci) => {
+      if(city.pop <= 0) return;
+      const isPlayer = nation.id === playerNation.id;
+      const color = isPlayer ? '#58a6ff' : '#f85149';
+      const sz = isPlayer ? 10 : 12;
+      const hitArea = 40; // generous click target
+      const isTargeted = targetQueue.some(function(tq){ return tq.nationId===nation.id && tq.cityIdx===ci; });
+      const el = document.createElement('div');
+      el.className = 'html-marker';
+      el.style.width = hitArea+'px'; el.style.height = hitArea+'px';
+      el.style.cursor = isPlayer ? 'default' : 'crosshair';
+      el.style.zIndex = isPlayer ? '30' : '35';
+      // Visible dot + pulsing ring for enemies + targeted indicator
+      var markerHTML = '<div class="html-marker-core" style="width:'+sz+'px;height:'+sz+'px;background:'+color+';box-shadow:0 0 10px '+color+',0 0 20px '+color+'44"></div>';
+      if(!isPlayer){
+        // Outer pulsing ring to make clickable cities obvious
+        markerHTML += '<div style="position:absolute;width:'+(sz*2.5)+'px;height:'+(sz*2.5)+'px;border:1.5px solid '+color+'88;border-radius:50%;animation:pulse-dot 2s ease-in-out infinite;top:50%;left:50%;transform:translate(-50%,-50%)"></div>';
+      }
+      if(isTargeted){
+        // Crosshair overlay for targeted cities
+        markerHTML += '<div style="position:absolute;width:'+(sz*3)+'px;height:'+(sz*3)+'px;border:2px solid #ff0;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 8px #ff0"></div>';
+        markerHTML += '<div style="position:absolute;font-family:JetBrains Mono,monospace;font-size:8px;color:#ff0;top:-14px;left:50%;transform:translateX(-50%);white-space:nowrap;text-shadow:0 0 4px #000,0 0 8px #000">☢ TARGET</div>';
+      }
+      // City name label
+      markerHTML += '<div style="position:absolute;font-family:JetBrains Mono,monospace;font-size:7px;letter-spacing:0.5px;color:'+(isPlayer?'#58a6ff99':'#f8514999')+';bottom:-12px;left:50%;transform:translateX(-50%);white-space:nowrap;text-shadow:0 0 4px #000,0 0 8px #000;pointer-events:none">'+city.name+'</div>';
+      el.innerHTML = markerHTML;
+      el.title = city.name + ' (' + nation.name + ') — Pop: ' + formatNum(city.pop);
+      if(!isPlayer) el.onclick = function(e){ e.stopPropagation(); addTarget(nation.id, ci); };
+      container.appendChild(el);
+      cityMarkerEls.push({el, lat:city.lat, lng:city.lng, nationId:nation.id, cityIdx:ci});
+      cityMarker3Ds.push(latLngToVec3(city.lat, city.lng, globeRadius * 1.001));
+    });
+  });
+}
+
+function updateCityMarkerPositions(){
+  var W = renderer.domElement.clientWidth;
+  var H = renderer.domElement.clientHeight;
+  var hw = W / 2;
+  var hh = H / 2;
+  cityMarkerEls.forEach(function(m, i){
+    var pos = _tempPos.copy(cityMarker3Ds[i]).applyMatrix4(globeGroup.matrixWorld);
+    // Visibility: check if marker is on the visible side of the globe
+    _tempViewDir.subVectors(camera.position, pos).normalize();
+    _tempNormal.copy(pos).normalize();
+    var isVisible = _tempNormal.dot(_tempViewDir) > 0.1;
+    if(isVisible){
+      pos.project(camera);
+      var x = (pos.x * hw) + hw;
+      var y = -(pos.y * hh) + hh;
+      m.el.style.left = x + 'px';
+      m.el.style.top = y + 'px';
+      m.el.classList.remove('hidden');
+    } else {
+      m.el.classList.add('hidden');
+    }
+  });
+}
+
+function addTarget(nationId, cityIdx){
+  if(gamePhase !== 'PLAYING') return;
+  if(playerNation.warheads <= targetQueue.length){
+    addLog('⚠ No warheads remaining!'); return;
+  }
+  var exists = targetQueue.find(function(t){ return t.nationId===nationId && t.cityIdx===cityIdx; });
+  if(exists){ removeTarget(nationId, cityIdx); return; }
+  var nation = liveNations.find(function(n){ return n.id===nationId; });
+  var city = nation.cities[cityIdx];
+  if(city.pop <= 0){ addLog('City already destroyed.'); return; }
+  targetQueue.push({nationId:nationId, cityIdx:cityIdx});
+  addLog('🎯 Targeting ' + city.name + ', ' + nation.name);
+  renderTargetQueue();
+  renderGlobalStats();
+}
+
+function removeTarget(nationId, cityIdx){
+  targetQueue = targetQueue.filter(function(t){ return !(t.nationId===nationId && t.cityIdx===cityIdx); });
+  renderTargetQueue();
+  renderGlobalStats();
+}
+
+function renderTargetQueue(){
+  var el = document.getElementById('targetList');
+  if(targetQueue.length === 0){
+    el.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:8px;font-style:italic">Click enemy cities on the globe to target them...</div>';
+    document.getElementById('launchBtn').style.display = 'none';
+    return;
+  }
+  el.innerHTML = targetQueue.map(function(t){
+    var nation = liveNations.find(function(n){ return n.id===t.nationId; });
+    var city = nation.cities[t.cityIdx];
+    return '<div class="ct-conflict-link" onclick="removeTarget(\''+t.nationId+'\','+t.cityIdx+')" style="margin-bottom:4px"><div class="ct-conflict-dot" style="background:var(--red)"></div><div class="ct-conflict-name">'+nation.flag+' '+city.name+'</div><div class="ct-conflict-sev" style="color:var(--text3)">✕</div></div>';
+  }).join('');
+  document.getElementById('launchBtn').style.display = 'block';
+}
+
+function launchMissiles(){
+  if(gamePhase !== 'PLAYING' || targetQueue.length === 0) return;
+  gamePhase = 'LAUNCHING';
+  document.getElementById('gamePhaseHeader').innerHTML = '☢ MISSILES INBOUND...';
+  document.getElementById('gamePhaseHeader').style.color = 'var(--red)';
+  document.getElementById('launchBtn').style.display = 'none';
+  addLog('🚀 LAUNCHING ' + targetQueue.length + ' WARHEADS!');
+  playerNation.warheads -= targetQueue.length;
+  updatePlayerHUD();
+  var delay = 0;
+  targetQueue.forEach(function(t){
+    var nation = liveNations.find(function(n){ return n.id===t.nationId; });
+    var city = nation.cities[t.cityIdx];
+    var fromCity = playerNation.cities[0];
+    setTimeout(function(){ launchOneMissile(fromCity, city, nation, t.cityIdx); }, delay);
+    delay += 400;
+  });
+  var totalDelay = delay;
+  setTimeout(function(){
+    targetQueue = [];
+    renderTargetQueue();
+    setTimeout(aiTurn, 1500);
+  }, totalDelay + 3000);
+}
+
+function launchOneMissile(from, to, targetNation, cityIdx){
+  var startPos = latLngToVec3(from.lat, from.lng, globeRadius * 1.002);
+  var endPos = latLngToVec3(to.lat, to.lng, globeRadius * 1.002);
+  var mid = startPos.clone().add(endPos).multiplyScalar(0.5).normalize().multiplyScalar(globeRadius * 1.4);
+  var curve = new THREE.QuadraticBezierCurve3(startPos, mid, endPos);
+  var pts = curve.getPoints(60);
+  var geo = new THREE.BufferGeometry().setFromPoints(pts);
+  var mat = new THREE.LineBasicMaterial({color:0xff4444, transparent:true, opacity:0.6});
+  var line = new THREE.Line(geo, mat);
+  globeGroup.add(line);
+  var dotGeo = new THREE.SphereGeometry(0.008, 8, 8);
+  var dotMat = new THREE.MeshBasicMaterial({color:0xff8844});
+  var dot = new THREE.Mesh(dotGeo, dotMat);
+  globeGroup.add(dot);
+  missileFlights.push({line:line, dot:dot, curve:curve, t:0, targetNation:targetNation, cityIdx:cityIdx, to:to, done:false});
+}
+
+function updateMissiles(dt){
+  missileFlights.forEach(function(f){
+    if(f.done) return;
+    f.t += dt * 0.4;
+    if(f.t >= 1){
+      f.t = 1; f.done = true;
+      globeGroup.remove(f.dot); globeGroup.remove(f.line);
+      f.dot.geometry.dispose(); f.dot.material.dispose();
+      f.line.geometry.dispose(); f.line.material.dispose();
+      var defended = Math.random() < f.targetNation.defense * 0.3;
+      if(defended){
+        addLog('🛡 ' + f.targetNation.flag + ' intercepted strike on ' + f.to.name + '!');
+      } else {
+        triggerExplosion(f.to.lat, f.to.lng, f.to, f.targetNation, f.cityIdx);
+      }
+    } else {
+      var pt = f.curve.getPoint(f.t);
+      f.dot.position.copy(pt);
+    }
+  });
+  missileFlights = missileFlights.filter(function(f){ return !f.done; });
+}
+
+function triggerExplosion(lat, lng, city, nation, cityIdx){
+  // ── Game logic: damage, kills, HUD ──
+  var kills = Math.round(city.pop * (0.4 + Math.random() * 0.4));
+  nation.cities[cityIdx].pop = Math.max(0, city.pop - kills);
+  totalKills += kills;
+  addLog('💥 ' + city.name + ' hit! ' + formatNum(kills) + ' casualties.');
+
+  // ── Use V3 explosion system (globe-only, no screen flash) ──
+  triggerExplosionV3(lat, lng);
+
+  updatePlayerHUD();
+  renderGlobalStats();
+  createCityMarkers();
+}
+
+function updateExplosions(dt){
+  explosions.forEach(function(e){
+    e.t += dt;
+
+    // ── LIGHT BEAM: shoots up fast, holds, fades ──
+    if(e.type === 'beam'){
+      var beamLife = 0.8;
+      if(e.t < 0.12){
+        var rise = e.t / 0.12;
+        e.mesh.scale.set(1, rise, 1);
+        e.mesh.material.opacity = 1.0;
+      } else {
+        var fadeT = (e.t - 0.12) / (beamLife - 0.12);
+        e.mesh.material.opacity = Math.max(0, 1.0 - fadeT * fadeT);
+        var widen = 1 + fadeT * 3;
+        e.mesh.scale.set(widen, 1, widen);
+      }
+      if(e.t > beamLife){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    if(e.type === 'beam_glow'){
+      var life = 0.7;
+      var fade = Math.max(0, 1 - e.t / life);
+      e.mesh.material.opacity = 0.35 * fade;
+      var s = 1 + e.t * 2;
+      e.mesh.scale.set(s, 1, s);
+      if(e.t > life){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── DETONATION FLASH: rapid expand + vanish ──
+    if(e.type === 'detonation'){
+      var s = 1 + e.t * 25;
+      e.mesh.scale.set(s, s, s);
+      e.mesh.material.opacity = Math.max(0, 1 - e.t * 3.5);
+      if(e.t > 0.35){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── EXPANSION WAVES: large rings racing outward ──
+    if(e.type === 'expansion_wave'){
+      var speed = 25 - e.waveIdx * 4;
+      var s = 1 + e.t * speed;
+      e.mesh.scale.set(s, s, s);
+      var life = 1.0 + e.waveIdx * 0.25;
+      e.mesh.material.opacity = Math.max(0, (0.85 - e.waveIdx*0.12) * (1 - e.t / life));
+      if(e.t > life){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── FIREBALL: grows, rises, color shifts orange→red→dark ──
+    if(e.type === 'fireball'){
+      var s = 1 + e.t * 4;
+      e.mesh.scale.set(s, s, s);
+      var riseAmt = Math.min(e.t * 0.06, 0.08);
+      e.mesh.position.copy(e.basePos.clone().add(e.normal.clone().multiplyScalar(0.02 + riseAmt)));
+      var r = e.t < 0.4 ? 1.0 : Math.max(0.2, 1.0 - (e.t - 0.4) * 1.0);
+      var g = Math.max(0, 0.6 - e.t * 0.5);
+      e.mesh.material.color.setRGB(r, g, 0);
+      e.mesh.material.opacity = Math.max(0, 0.9 - e.t * 0.45);
+      if(e.t > 2.0){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    if(e.type === 'fireball_core'){
+      var s = 1 + e.t * 3;
+      e.mesh.scale.set(s, s, s);
+      var riseAmt = Math.min(e.t * 0.06, 0.08);
+      e.mesh.position.copy(e.basePos.clone().add(e.normal.clone().multiplyScalar(0.02 + riseAmt)));
+      e.mesh.material.opacity = Math.max(0, 0.95 - e.t * 1.2);
+      if(e.t > 0.9){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── MUSHROOM STEM: segments rise to form thick column (1 sec rise) ──
+    if(e.type === 'mushroom_stem'){
+      var riseDuration = 1.0;
+      var riseT = Math.min(e.t / riseDuration, 1);
+      // Ease-out for smooth rise
+      var easedT = 1 - Math.pow(1 - riseT, 2);
+      var height = e.targetHeight * easedT;
+      e.mesh.position.copy(e.basePos.clone().add(e.normal.clone().multiplyScalar(height)));
+      // Widen as it rises
+      var stemWidth = 0.6 + easedT * 1.0 + (e.segIdx / e.totalSegs) * 0.5;
+      e.mesh.scale.set(stemWidth, stemWidth, stemWidth);
+      e.mesh.material.opacity = Math.max(0, 0.65 - Math.max(0, e.t - 1.5) * 0.18);
+      if(e.t > 5){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── MUSHROOM CAP: spheres cluster at top, spread outward ──
+    if(e.type === 'mushroom_cap'){
+      var riseDuration = 1.2;
+      var riseT = Math.min(e.t / riseDuration, 1);
+      var easedT = 1 - Math.pow(1 - riseT, 2);
+      var height = e.targetHeight * easedT;
+      // Tangent vectors for spread
+      var tangent1 = new THREE.Vector3(1,0,0).cross(e.normal).normalize();
+      if(tangent1.length() < 0.1) tangent1 = new THREE.Vector3(0,1,0).cross(e.normal).normalize();
+      var tangent2 = e.normal.clone().cross(tangent1).normalize();
+      var spreadAmt = e.capSpread * easedT;
+      var offset = e.normal.clone().multiplyScalar(height)
+        .add(tangent1.clone().multiplyScalar(Math.cos(e.capAngle) * spreadAmt))
+        .add(tangent2.clone().multiplyScalar(Math.sin(e.capAngle) * spreadAmt));
+      e.mesh.position.copy(e.basePos.clone().add(offset));
+      var s = 0.3 + easedT * 1.5;
+      e.mesh.scale.set(s, s * 0.65, s);  // oblate
+      e.mesh.material.opacity = Math.max(0, 0.6 - Math.max(0, e.t - 2) * 0.15);
+      if(e.t > 5.5){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── MUSHROOM DOME: bright top glow ──
+    if(e.type === 'mushroom_dome'){
+      var riseDuration = 1.3;
+      var riseT = Math.min(e.t / riseDuration, 1);
+      var easedT = 1 - Math.pow(1 - riseT, 2);
+      var height = 0.4 * easedT;
+      e.mesh.position.copy(e.basePos.clone().add(e.normal.clone().multiplyScalar(height)));
+      var s = 0.2 + easedT * 1.5;
+      e.mesh.scale.set(s, s * 0.55, s);
+      e.mesh.material.opacity = Math.max(0, 0.45 - Math.max(0, e.t - 1.5) * 0.1);
+      var bright = Math.max(0.3, 1 - e.t * 0.2);
+      e.mesh.material.color.setRGB(bright, bright * 0.55, bright * 0.15);
+      if(e.t > 5.5){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── DEBRIS: particles with physics ──
+    if(e.type === 'debris'){
+      e.mesh.position.add(e.vel);
+      var gravity = e.mesh.position.clone().normalize().multiplyScalar(-0.00012);
+      e.vel.add(gravity);
+      e.vel.multiplyScalar(0.982);
+      e.mesh.material.opacity = Math.max(0, 0.85 - e.t * 0.35);
+      var s = Math.max(0.2, 1 - e.t * 0.25);
+      e.mesh.scale.set(s, s, s);
+      if(e.t > 3){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+
+    // ── EMBER: lingering glow, slow pulse + fade ──
+    if(e.type === 'ember'){
+      var pulse = 0.3 + Math.sin(e.t * 2) * 0.1;
+      e.mesh.material.opacity = Math.max(0, pulse - e.t * 0.025);
+      var s = 1 + e.t * 0.15;
+      e.mesh.scale.set(s, s, s);
+      if(e.t > 10){
+        globeGroup.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.done = true;
+      }
+    }
+  });
+  explosions = explosions.filter(function(e){ return !e.done; });
+}
+function aiTurn(){
+  gamePhase = 'AI_TURN';
+  document.getElementById('gamePhaseHeader').innerHTML = '☢ ENEMY RETALIATION...';
+  addLog('⚠ Enemy nations are retaliating!');
+  var aiDelay = 0;
+  aiNations.forEach(function(ai){
+    if(ai.warheads <= 0 || ai.cities.every(function(c){ return c.pop<=0; })) return;
+    var numStrikes = Math.min(ai.warheads, Math.ceil(Math.random()*2));
+    for(var i = 0; i < numStrikes; i++){
+      var aliveCities = playerNation.cities.filter(function(c){ return c.pop>0; });
+      if(aliveCities.length === 0) break;
+      var target = aliveCities[Math.floor(Math.random()*aliveCities.length)];
+      var tIdx = playerNation.cities.indexOf(target);
+      var aiCity = ai.cities.find(function(c){ return c.pop>0; }) || ai.cities[0];
+      ai.warheads--;
+      (function(a, ac, tg, ti){
+        setTimeout(function(){
+          addLog('🚀 ' + a.flag + ' ' + a.name + ' launched at ' + tg.name + '!');
+          launchOneMissile(ac, tg, playerNation, ti);
+        }, aiDelay);
+      })(ai, aiCity, target, tIdx);
+      aiDelay += 600;
+    }
+  });
+  setTimeout(function(){ setTimeout(endTurn, 2000); }, aiDelay + 3000);
+}
+
+function endTurn(){
+  var playerAlive = playerNation.cities.some(function(c){ return c.pop>0; });
+  var anyEnemyAlive = aiNations.some(function(n){ return n.cities.some(function(c){ return c.pop>0; }) && n.warheads > 0; });
+  if(!playerAlive){ gameOver(false); return; }
+  if(!anyEnemyAlive || playerNation.warheads <= 0){ gameOver(true); return; }
+  turnNumber++;
+  gamePhase = 'PLAYING';
+  document.getElementById('gamePhaseHeader').innerHTML = '☢ TURN ' + turnNumber + ' — SELECT TARGETS';
+  document.getElementById('gamePhaseHeader').style.color = 'var(--accent2)';
+  addLog('── Turn ' + turnNumber + ' ──');
+  updatePlayerHUD();
+  renderGlobalStats();
+  createCityMarkers();
+}
+
+function gameOver(won){
+  gamePhase = 'GAME_OVER';
+  var msg = won ? '🏆 VICTORY — All enemies neutralized' : '💀 DEFEAT — Your nation has fallen';
+  document.getElementById('gamePhaseHeader').innerHTML = msg;
+  document.getElementById('gamePhaseHeader').style.color = won ? 'var(--green)' : 'var(--red)';
+  addLog(msg);
+  addLog('Total casualties: ' + formatNum(totalKills));
+  document.getElementById('targetQueue').innerHTML = '<div style="text-align:center;padding:20px"><div style="font-size:32px;margin-bottom:12px">' + (won ? '☢️' : '💀') + '</div><div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:6px">' + (won ? 'VICTORY' : 'DEFEAT') + '</div><div style="font-size:11px;color:var(--text2);margin-bottom:12px">Total casualties: ' + formatNum(totalKills) + '</div><button onclick="location.reload()" style="padding:10px 24px;font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;background:var(--bg3);color:var(--accent2);border:1px solid var(--accent);border-radius:6px;cursor:pointer">Play Again</button></div>';
+}
+
+function addLog(msg){
+  gameLog.unshift(msg);
+  if(gameLog.length > 50) gameLog.pop();
+  var el = document.getElementById('logEntries');
+  if(el) el.innerHTML = gameLog.map(function(m){ return '<div style="padding:2px 0;border-bottom:1px solid var(--border)">' + m + '</div>'; }).join('');
+}
+
+// Stubs for tracker compat (only stub functions not defined elsewhere)
+function renderFilters(){}
+function renderSortControls(){}
+function renderList(){}
+function renderStats(){}
+function selectConflict(){}
+function filterList(){}
+function switchTab(){}
+function showDetail(){}
+function closeDetail(){ document.getElementById('detailPanel').classList.remove('visible'); }
+
+// ═══════════════════════════════════════════════════════════════
+// EXPLOSION V3 — NEW SYSTEM (built separately for safe testing)
+// Realistic nuclear: flash → fireball → shockwave → mushroom → debris
+// All effects on globe only. No full-screen flash.
+// ═══════════════════════════════════════════════════════════════
+
+var explosionsV3 = []; // separate array from old system
+
+function triggerExplosionV3(lat, lng){
+  var pos = latLngToVec3(lat, lng, globeRadius * 1.003);
+  var N = pos.clone().normalize(); // surface normal
+
+  // Tangent basis for surface-aligned effects
+  var T1 = new THREE.Vector3(1,0,0).cross(N).normalize();
+  if(T1.lengthSq() < 0.01) T1 = new THREE.Vector3(0,1,0).cross(N).normalize();
+  var T2 = N.clone().cross(T1).normalize();
+
+  // Per-detonation randomization
+  var sVar = 0.85 + Math.random()*0.3;  // size 0.85x–1.15x
+  var cShift = Math.random()*0.12;       // subtle hue shift
+
+  // Quaternion to orient cylinders/hemispheres along surface normal
+  var upQ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), N);
+
+  // ─── 1. INITIAL FLASH — bright point, globe-only, very fast ───
+  var flGeo = new THREE.SphereGeometry(0.02*sVar, 16, 16);
+  var flMat = new THREE.MeshBasicMaterial({color:0xeeffff, transparent:true, opacity:1, depthWrite:false});
+  var fl = new THREE.Mesh(flGeo, flMat);
+  fl.position.copy(pos);
+  globeGroup.add(fl);
+  explosionsV3.push({type:'v3_flash', mesh:fl, t:0, sVar:sVar});
+
+  // ─── 2. GLOBE SHAKE — only moves globeGroup ───
+  var gOX=globeGroup.position.x, gOY=globeGroup.position.y, gOZ=globeGroup.position.z;
+  var skT=0;
+  var skI=setInterval(function(){
+    skT+=0.025;
+    if(skT>1){clearInterval(skI);globeGroup.position.set(gOX,gOY,gOZ);return;}
+    var amp=skT<0.12? 0.04*(1-skT/0.12) : 0.012*Math.pow(1-skT,3);
+    globeGroup.position.x=gOX+(Math.random()-0.5)*amp;
+    globeGroup.position.y=gOY+(Math.random()-0.5)*amp;
+    globeGroup.position.z=gOZ+(Math.random()-0.5)*amp*0.3;
+  },16);
+
+  // ─── 3. FIREBALL — white→orange→red-brown, rises slightly ───
+  setTimeout(function(){
+    var fbGeo = new THREE.SphereGeometry(0.028*sVar, 20, 20);
+    var fbMat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.9, depthWrite:false});
+    var fb = new THREE.Mesh(fbGeo, fbMat);
+    fb.position.copy(pos.clone().add(N.clone().multiplyScalar(0.01)));
+    globeGroup.add(fb);
+    explosionsV3.push({type:'v3_fireball', mesh:fb, t:0, N:N.clone(), base:pos.clone(), sVar:sVar, cShift:cShift});
+
+    // Hot inner core
+    var icGeo = new THREE.SphereGeometry(0.015*sVar, 14, 14);
+    var icMat = new THREE.MeshBasicMaterial({color:0xffffee, transparent:true, opacity:1, depthWrite:false});
+    var ic = new THREE.Mesh(icGeo, icMat);
+    ic.position.copy(fb.position);
+    globeGroup.add(ic);
+    explosionsV3.push({type:'v3_core', mesh:ic, t:0, N:N.clone(), base:pos.clone(), sVar:sVar});
+  }, 40);
+
+  // ─── 4. SHOCKWAVE — 2 rings racing along globe surface ───
+  setTimeout(function(){
+    for(var i=0;i<2;i++){
+      (function(idx){
+        var rGeo = new THREE.RingGeometry(0.003, 0.01+idx*0.004, 72);
+        var rMat = new THREE.MeshBasicMaterial({
+          color: idx===0?0xffffff:0xffddaa, transparent:true,
+          opacity:0.6-idx*0.15, side:THREE.DoubleSide, depthWrite:false
+        });
+        var rMesh = new THREE.Mesh(rGeo, rMat);
+        rMesh.position.copy(pos.clone().add(N.clone().multiplyScalar(0.002)));
+        rMesh.lookAt(rMesh.position.clone().add(N));
+        globeGroup.add(rMesh);
+        explosionsV3.push({type:'v3_shockwave', mesh:rMesh, t:0, idx:idx, sVar:sVar});
+      })(i);
+    }
+  }, 60);
+
+  // ─── 5. THERMAL GLOW — warm orange surface mark ───
+  setTimeout(function(){
+    var tGeo = new THREE.CircleGeometry(0.035*sVar, 32);
+    var tMat = new THREE.MeshBasicMaterial({
+      color:0xff6600, transparent:true, opacity:0.3,
+      side:THREE.DoubleSide, depthWrite:false
+    });
+    var tMesh = new THREE.Mesh(tGeo, tMat);
+    tMesh.position.copy(pos.clone().add(N.clone().multiplyScalar(0.001)));
+    tMesh.lookAt(tMesh.position.clone().add(N));
+    globeGroup.add(tMesh);
+    explosionsV3.push({type:'v3_thermal', mesh:tMesh, t:0, sVar:sVar});
+  }, 30);
+
+  // ─── 6. MUSHROOM STEM — segments rise one by one ───
+  setTimeout(function(){
+    var nSegs = 12;
+    for(var s=0;s<nSegs;s++){
+      var sR = (0.012 - s*0.0003)*sVar;
+      var sGeo = new THREE.SphereGeometry(sR, 8, 8);
+      var frac = s/nSegs;
+      var r = 0.4+frac*0.35+cShift, g = 0.2+frac*0.1, b = 0.08+frac*0.04;
+      var sMat = new THREE.MeshBasicMaterial({
+        color:new THREE.Color(r,g,b), transparent:true, opacity:0.55, depthWrite:false
+      });
+      var sP = new THREE.Mesh(sGeo, sMat);
+      sP.position.copy(pos);
+      globeGroup.add(sP);
+      explosionsV3.push({
+        type:'v3_stem', mesh:sP, t:0, N:N.clone(), base:pos.clone(),
+        seg:s, total:nSegs, sVar:sVar,
+        tgtH: (0.02 + s*0.02)*sVar,
+        wobble:(Math.random()-0.5)*0.006,
+        startColor:new THREE.Color(r,g,b)
+      });
+    }
+  }, 180);
+
+  // ─── 7. MUSHROOM CAP — cluster of blobs at top ───
+  setTimeout(function(){
+    var nCap = 8 + Math.floor(Math.random()*4);
+    for(var c=0;c<nCap;c++){
+      var cR = (0.03+Math.random()*0.02)*sVar;
+      var cGeo = new THREE.SphereGeometry(cR, 10, 10);
+      var cr=0.5+Math.random()*0.3+cShift, cg=0.2+Math.random()*0.12, cb=0.07+Math.random()*0.05;
+      var cMat = new THREE.MeshBasicMaterial({
+        color:new THREE.Color(cr,cg,cb), transparent:true, opacity:0.5, depthWrite:false
+      });
+      var cP = new THREE.Mesh(cGeo, cMat);
+      cP.position.copy(pos);
+      globeGroup.add(cP);
+      var ang = (c/nCap)*Math.PI*2 + (Math.random()-0.5)*0.5;
+      var spr = (0.02+Math.random()*0.03)*sVar;
+      explosionsV3.push({
+        type:'v3_cap', mesh:cP, t:0, N:N.clone(), base:pos.clone(),
+        T1:T1.clone(), T2:T2.clone(),
+        ang:ang, spr:spr, sVar:sVar,
+        tgtH:(0.25+Math.random()*0.08)*sVar,
+        startColor:new THREE.Color(cr,cg,cb)
+      });
+    }
+
+    // Dome glow at cap top
+    var dGeo = new THREE.SphereGeometry(0.045*sVar, 14, 14);
+    var dMat = new THREE.MeshBasicMaterial({color:0xffbb44, transparent:true, opacity:0.35, depthWrite:false});
+    var dM = new THREE.Mesh(dGeo, dMat);
+    dM.position.copy(pos);
+    globeGroup.add(dM);
+    explosionsV3.push({type:'v3_dome', mesh:dM, t:0, N:N.clone(), base:pos.clone(), sVar:sVar});
+  }, 220);
+
+  // ─── 8. DEBRIS — drawn upward then drifts/settles ───
+  setTimeout(function(){
+    for(var p=0;p<25;p++){
+      var pS = (0.002+Math.random()*0.005)*sVar;
+      var pGeo = new THREE.SphereGeometry(pS, 5, 5);
+      var sh = Math.random();
+      var pC = sh>0.8?0xff5500 : sh>0.5?0x7a4422 : sh>0.25?0x555544 : 0x333322;
+      var pMat = new THREE.MeshBasicMaterial({color:pC, transparent:true, opacity:0.8, depthWrite:false});
+      var pM = new THREE.Mesh(pGeo, pMat);
+      pM.position.copy(pos);
+      var vel = N.clone().multiplyScalar(0.002+Math.random()*0.006);
+      vel.add(T1.clone().multiplyScalar((Math.random()-0.5)*0.003));
+      vel.add(T2.clone().multiplyScalar((Math.random()-0.5)*0.003));
+      globeGroup.add(pM);
+      explosionsV3.push({
+        type:'v3_debris', mesh:pM, t:0, vel:vel, N:N.clone(),
+        riseT:0.6+Math.random()*1.0,
+        drift:new THREE.Vector3((Math.random()-0.5)*0.0008,(Math.random()-0.5)*0.0008,(Math.random()-0.5)*0.0008)
+      });
+    }
+  }, 130);
+
+  // ─── PERMANENT: scorched crater ───
+  var crGeo = new THREE.CircleGeometry(0.05*sVar, 28);
+  var crMat = new THREE.MeshBasicMaterial({color:0x1a0800, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false});
+  var cr = new THREE.Mesh(crGeo, crMat);
+  cr.position.copy(latLngToVec3(lat, lng, globeRadius*1.0004));
+  cr.lookAt(cr.position.clone().add(N));
+  globeGroup.add(cr);
+
+  // Lingering ember glow
+  var emGeo = new THREE.SphereGeometry(0.04*sVar, 12, 12);
+  var emMat = new THREE.MeshBasicMaterial({color:0xff3300, transparent:true, opacity:0.2, depthWrite:false});
+  var em = new THREE.Mesh(emGeo, emMat);
+  em.position.copy(pos);
+  globeGroup.add(em);
+  explosionsV3.push({type:'v3_ember', mesh:em, t:0});
+}
+
+function updateExplosionsV3(dt){
+  function kill(e){globeGroup.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();e.dead=true;}
+
+  explosionsV3.forEach(function(e){
+    e.t += dt;
+
+    if(e.type==='v3_flash'){
+      var s=1+e.t*50; e.mesh.scale.set(s,s,s);
+      e.mesh.material.opacity=Math.max(0,1-e.t*8);
+      if(e.t>0.15) kill(e);
+    }
+
+    if(e.type==='v3_fireball'){
+      var s=1+e.t*4.5*e.sVar; e.mesh.scale.set(s,s,s);
+      var rise=Math.min(e.t*0.04,0.05);
+      e.mesh.position.copy(e.base.clone().add(e.N.clone().multiplyScalar(0.01+rise)));
+      // Color: white→orange→red-brown
+      var r,g,b;
+      if(e.t<0.15){r=1;g=1;b=0.9;}
+      else if(e.t<0.5){var f=(e.t-0.15)/0.35; r=1;g=1-f*0.4;b=0.9-f*0.8;}
+      else if(e.t<1.2){var f=(e.t-0.5)/0.7; r=1-f*0.3;g=0.6-f*0.3;b=0.1-f*0.05;}
+      else{var f=Math.min((e.t-1.2)/0.8,1); r=0.7-f*0.4;g=0.3-f*0.2;b=0.05;}
+      e.mesh.material.color.setRGB(r+e.cShift,g,b);
+      e.mesh.material.opacity=Math.max(0,0.9-Math.max(0,e.t-0.6)*0.5);
+      if(e.t>2) kill(e);
+    }
+
+    if(e.type==='v3_core'){
+      var s=1+e.t*3.5*e.sVar; e.mesh.scale.set(s,s,s);
+      var rise=Math.min(e.t*0.04,0.05);
+      e.mesh.position.copy(e.base.clone().add(e.N.clone().multiplyScalar(0.01+rise)));
+      e.mesh.material.opacity=Math.max(0,1-e.t*1.8);
+      if(e.t>0.6) kill(e);
+    }
+
+    if(e.type==='v3_shockwave'){
+      var spd=25-e.idx*5; var s=1+e.t*spd;
+      e.mesh.scale.set(s,s,s);
+      var life=1.0+e.idx*0.2;
+      e.mesh.material.opacity=Math.max(0,(0.6-e.idx*0.15)*(1-e.t/life));
+      if(e.t>life) kill(e);
+    }
+
+    if(e.type==='v3_thermal'){
+      var s=1+e.t*6*e.sVar; e.mesh.scale.set(s,s,1);
+      e.mesh.material.opacity=Math.max(0,0.3*(1-e.t/0.7));
+      if(e.t>0.7) kill(e);
+    }
+
+    if(e.type==='v3_stem'){
+      var dur=1.0; var rt=Math.min(e.t/dur,1);
+      var ez=1-Math.pow(1-rt,2.5);
+      var h=e.tgtH*ez;
+      e.mesh.position.copy(e.base.clone().add(e.N.clone().multiplyScalar(h)));
+      // Turbulence wobble
+      if(e.wobble){
+        var wOff=e.wobble*Math.sin(e.t*3.5+e.seg*1.1);
+        e.mesh.position.x+=wOff; e.mesh.position.y+=wOff*0.5;
+      }
+      var w=0.5+ez*0.8+(e.seg/e.total)*0.5;
+      e.mesh.scale.set(w,w,w);
+      e.mesh.material.opacity=Math.max(0,0.55-Math.max(0,e.t-1.8)*0.12);
+      // Cool: brown→grey-white
+      if(e.t>1.5&&e.startColor){
+        var cool=Math.min((e.t-1.5)/3,1)*0.25;
+        var sc=e.startColor;
+        e.mesh.material.color.setRGB(sc.r+(0.7-sc.r)*cool, sc.g+(0.65-sc.g)*cool, sc.b+(0.6-sc.b)*cool);
+      }
+      if(e.t>5) kill(e);
+    }
+
+    if(e.type==='v3_cap'){
+      var dur=1.3; var rt=Math.min(e.t/dur,1);
+      var ez=1-Math.pow(1-rt,2);
+      var h=e.tgtH*ez;
+      var spread=e.spr*ez;
+      var lateralGrow=e.t>dur?1+(e.t-dur)*0.12:1;
+      var off=e.N.clone().multiplyScalar(h)
+        .add(e.T1.clone().multiplyScalar(Math.cos(e.ang)*spread*lateralGrow))
+        .add(e.T2.clone().multiplyScalar(Math.sin(e.ang)*spread*lateralGrow));
+      e.mesh.position.copy(e.base.clone().add(off));
+      var s=0.3+ez*1.3;
+      var flat=0.6-Math.max(0,e.t-dur)*0.025;
+      e.mesh.scale.set(s*lateralGrow, s*Math.max(0.35,flat), s*lateralGrow);
+      e.mesh.material.opacity=Math.max(0,0.5-Math.max(0,e.t-2.5)*0.08);
+      // Cool: red-brown → white
+      if(e.t>1.5&&e.startColor){
+        var cool=Math.min((e.t-1.5)/4,1);
+        var sc=e.startColor;
+        e.mesh.material.color.setRGB(sc.r+(0.82-sc.r)*cool, sc.g+(0.8-sc.g)*cool, sc.b+(0.75-sc.b)*cool);
+      }
+      if(e.t>6) kill(e);
+    }
+
+    if(e.type==='v3_dome'){
+      var dur=1.4; var rt=Math.min(e.t/dur,1);
+      var ez=1-Math.pow(1-rt,2);
+      var h=0.3*e.sVar*ez;
+      e.mesh.position.copy(e.base.clone().add(e.N.clone().multiplyScalar(h)));
+      var s=0.2+ez*1.3; e.mesh.scale.set(s,s*0.45,s);
+      e.mesh.material.opacity=Math.max(0,0.35-Math.max(0,e.t-2)*0.07);
+      var br=Math.max(0.4,1-e.t*0.15);
+      e.mesh.material.color.setRGB(br,br*0.55+0.25,br*0.15+0.3);
+      if(e.t>6) kill(e);
+    }
+
+    if(e.type==='v3_debris'){
+      if(e.t<e.riseT){
+        e.mesh.position.add(e.vel); e.vel.multiplyScalar(0.99);
+      } else {
+        var grav=e.mesh.position.clone().normalize().multiplyScalar(-0.00005);
+        e.vel.add(grav); e.vel.add(e.drift); e.vel.multiplyScalar(0.996);
+        e.mesh.position.add(e.vel);
+      }
+      e.mesh.material.opacity=Math.max(0,0.8-e.t*0.16);
+      var s=Math.max(0.3,1-e.t*0.12); e.mesh.scale.set(s,s,s);
+      if(e.t>5) kill(e);
+    }
+
+    if(e.type==='v3_ember'){
+      var pulse=0.2+Math.sin(e.t*2)*0.08;
+      e.mesh.material.opacity=Math.max(0,pulse-e.t*0.02);
+      var s=1+e.t*0.12; e.mesh.scale.set(s,s,s);
+      if(e.t>8) kill(e);
+    }
+  });
+  explosionsV3=explosionsV3.filter(function(e){return !e.dead;});
+}
+
+// ─── Hook V3 into the animation loop ───
+var _origAnimate = animate;
+// We'll patch the game loop to also update V3 explosions
+// by injecting into the existing animate's game-update section
+
+// ─── Init ───
+renderGlobalStats();
+renderNationSelect();
+updateTimestampEnhanced();
+setInterval(updateTimestampEnhanced, 1000);
+initGlobe();
+</script>
+</body>
+</html>
