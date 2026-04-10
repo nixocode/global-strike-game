@@ -266,6 +266,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .dp-party{font-size:10px;padding:4px 12px;border-radius:4px;background:var(--bg4);border:1px solid var(--border2);color:var(--text2);transition:all .2s}
 .dp-party:hover{border-color:var(--accent);color:var(--accent2)}
 
+/* ─── Destroyed Nation Overlay Markers ─── */
+.destruction-marker{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:22}
+.destruction-fire{position:absolute;width:6px;height:6px;border-radius:50%;animation:fireFlicker 0.3s ease-in-out infinite alternate}
+@keyframes fireFlicker{0%{opacity:0.6;transform:scale(1)}100%{opacity:1;transform:scale(1.4)}}
+.destruction-smoke{position:absolute;width:10px;height:10px;border-radius:50%;background:rgba(80,60,40,0.4);animation:smokeRise 3s ease-out infinite;pointer-events:none}
+@keyframes smokeRise{0%{opacity:0.5;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-40px) scale(2.5)}}
+.destroyed-label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;z-index:23;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--red);text-shadow:0 0 8px rgba(248,81,73,0.6),0 0 16px rgba(248,81,73,0.3);animation:destroyedPulse 2s ease-in-out infinite}
+@keyframes destroyedPulse{0%,100%{opacity:0.7}50%{opacity:1}}
+
 /* ─── Animations ─── */
 @keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .conflict-card,.news-item{animation:fadeInUp .3s ease-out backwards}
@@ -405,6 +414,9 @@ let totalKills = 0;
 let gameLog = [];
 let missileFlights = []; // active missile animations
 let explosions = []; // active explosion VFX
+let destroyedNationIds = new Set(); // track fully destroyed nations
+let destructionEffects3D = []; // persistent 3D fire/smoke on destroyed countries
+let destructionMarkerEls = []; // HTML overlay fire markers
 let craterMarks = []; // permanent impact marks
 
 // Keep a mutable copy of nations for game state
@@ -1398,6 +1410,7 @@ function animate(){
   if(typeof updateExplosions === 'function') updateExplosions(gdt);
   if(typeof updateExplosionsV3 === 'function') updateExplosionsV3(gdt);
   if(typeof updateCityMarkerPositions === 'function' && typeof cityMarkerEls !== 'undefined' && cityMarkerEls.length > 0) updateCityMarkerPositions();
+  if(typeof updateDestructionEffects === 'function' && destroyedNationIds.size > 0) updateDestructionEffects(t);
 
   renderer.render(scene, camera);
 }
@@ -1712,6 +1725,9 @@ function triggerExplosion(lat, lng, city, nation, cityIdx){
   // ── Use V3 explosion system (globe-only, no screen flash) ──
   triggerExplosionV3(lat, lng);
 
+  // ── Check if nation is fully destroyed ──
+  checkNationDestroyed(nation);
+
   updatePlayerHUD();
   renderGlobalStats();
   createCityMarkers();
@@ -1951,6 +1967,238 @@ function filterList(){}
 function switchTab(){}
 function showDetail(){}
 function closeDetail(){ document.getElementById('detailPanel').classList.remove('visible'); }
+
+// ═══════════════════════════════════════════════════════════════
+// COUNTRY DESTRUCTION SYSTEM — Catastrophic visual effects
+// When a nation loses all cities, its territory burns on the globe
+// ═══════════════════════════════════════════════════════════════
+
+// Map nation IDs to ISO codes for matching country polygons
+const NATION_TO_ISO = {
+  'usa':'840','russia':'643','china':'156','uk':'826','france':'250',
+  'india':'356','pakistan':'586','israel':'376','nkorea':'408','iran':'364'
+};
+
+function checkNationDestroyed(nation){
+  var allDead = nation.cities.every(function(c){ return c.pop <= 0; });
+  if(allDead && !destroyedNationIds.has(nation.id)){
+    destroyedNationIds.add(nation.id);
+    addLog('☠️ ' + nation.flag + ' ' + nation.name + ' HAS BEEN DESTROYED!');
+    applyDestructionVisuals(nation);
+  }
+}
+
+function applyDestructionVisuals(nation){
+  var isoCode = NATION_TO_ISO[nation.id];
+  if(!isoCode) return;
+
+  // ── 1. Turn country polygons to scorched burning look ──
+  countryFills.forEach(function(mesh){
+    if(mesh.userData.countryId === isoCode){
+      mesh.userData.destroyed = true;
+      mesh.userData.destroyTime = performance.now();
+      mesh.material.color.set('#4a0800');
+      mesh.material.opacity = 0.35;
+      mesh.material.transparent = true;
+    }
+  });
+
+  // ── 2. Turn borders to fiery red/orange ──
+  // We can't easily match borders to specific countries in the current mesh structure,
+  // so we add fire effects on all city locations and across the territory
+
+  // ── 3. Add 3D fire effects across the nation's territory ──
+  var cities = nation.cities;
+  cities.forEach(function(city){
+    // Multiple fire points per city for coverage
+    for(var f = 0; f < 5; f++){
+      var offsetLat = city.lat + (Math.random() - 0.5) * 3;
+      var offsetLng = city.lng + (Math.random() - 0.5) * 3;
+      addFireEffect3D(offsetLat, offsetLng);
+    }
+    // Large scorch mark at each city
+    addScorchMark3D(city.lat, city.lng);
+  });
+
+  // ── 4. Add fire points between cities for territory coverage ──
+  for(var i = 0; i < cities.length - 1; i++){
+    for(var j = i + 1; j < cities.length; j++){
+      var nPoints = 3 + Math.floor(Math.random() * 3);
+      for(var p = 0; p < nPoints; p++){
+        var t = (p + 1) / (nPoints + 1) + (Math.random() - 0.5) * 0.15;
+        var lat = cities[i].lat + (cities[j].lat - cities[i].lat) * t + (Math.random() - 0.5) * 4;
+        var lng = cities[i].lng + (cities[j].lng - cities[i].lng) * t + (Math.random() - 0.5) * 4;
+        addFireEffect3D(lat, lng);
+      }
+    }
+  }
+
+  // ── 5. Add HTML overlay destruction labels ──
+  var centerLat = cities.reduce(function(s,c){return s+c.lat;},0) / cities.length;
+  var centerLng = cities.reduce(function(s,c){return s+c.lng;},0) / cities.length;
+  addDestructionLabel(centerLat, centerLng, nation.flag + ' DESTROYED');
+}
+
+function addFireEffect3D(lat, lng){
+  var pos = latLngToVec3(lat, lng, globeRadius * 1.005);
+  var N = pos.clone().normalize();
+
+  // Fire glow sphere (persistent, animated in update loop)
+  var fSize = 0.008 + Math.random() * 0.015;
+  var fGeo = new THREE.SphereGeometry(fSize, 8, 8);
+  var fireColors = [0xff2200, 0xff4400, 0xff6600, 0xffaa00, 0xff3311];
+  var fColor = fireColors[Math.floor(Math.random() * fireColors.length)];
+  var fMat = new THREE.MeshBasicMaterial({color: fColor, transparent: true, opacity: 0.5, depthWrite: false});
+  var fMesh = new THREE.Mesh(fGeo, fMat);
+  fMesh.position.copy(pos);
+  globeGroup.add(fMesh);
+
+  // Smoke plume above fire
+  var smSize = 0.012 + Math.random() * 0.02;
+  var smGeo = new THREE.SphereGeometry(smSize, 6, 6);
+  var smMat = new THREE.MeshBasicMaterial({color: 0x332211, transparent: true, opacity: 0.25, depthWrite: false});
+  var smMesh = new THREE.Mesh(smGeo, smMat);
+  smMesh.position.copy(pos.clone().add(N.clone().multiplyScalar(0.03)));
+  globeGroup.add(smMesh);
+
+  destructionEffects3D.push({
+    type: 'fire',
+    mesh: fMesh,
+    smoke: smMesh,
+    basePos: pos.clone(),
+    normal: N.clone(),
+    phase: Math.random() * Math.PI * 2,
+    speed: 2 + Math.random() * 3,
+    baseOpacity: 0.3 + Math.random() * 0.4,
+    baseSize: fSize
+  });
+}
+
+function addScorchMark3D(lat, lng){
+  var pos = latLngToVec3(lat, lng, globeRadius * 1.0003);
+  var N = pos.clone().normalize();
+
+  // Large scorched area
+  var scSize = 0.06 + Math.random() * 0.04;
+  var scGeo = new THREE.CircleGeometry(scSize, 24);
+  var scMat = new THREE.MeshBasicMaterial({
+    color: 0x1a0500, transparent: true, opacity: 0.6,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  var scMesh = new THREE.Mesh(scGeo, scMat);
+  scMesh.position.copy(pos);
+  scMesh.lookAt(scMesh.position.clone().add(N));
+  globeGroup.add(scMesh);
+
+  // Fiery ring around scorch mark
+  var ringGeo = new THREE.RingGeometry(scSize * 0.8, scSize * 1.1, 32);
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: 0xff3300, transparent: true, opacity: 0.2,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  var ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.position.copy(pos.clone().add(N.clone().multiplyScalar(0.0005)));
+  ringMesh.lookAt(ringMesh.position.clone().add(N));
+  globeGroup.add(ringMesh);
+
+  destructionEffects3D.push({
+    type: 'scorch_ring',
+    mesh: ringMesh,
+    phase: Math.random() * Math.PI * 2,
+    speed: 1.5 + Math.random()
+  });
+}
+
+function addDestructionLabel(lat, lng, text){
+  var pos3d = latLngToVec3(lat, lng, globeRadius * 1.02);
+  destructionMarkerEls.push({
+    pos3d: pos3d,
+    text: text,
+    el: null // created in update
+  });
+}
+
+// ── Animate destruction effects (called every frame) ──
+function updateDestructionEffects(t){
+  // 3D fire/smoke animation
+  destructionEffects3D.forEach(function(ef){
+    if(ef.type === 'fire'){
+      // Flickering fire
+      var flicker = Math.sin(t * ef.speed + ef.phase) * 0.5 + 0.5;
+      var flicker2 = Math.sin(t * ef.speed * 1.7 + ef.phase * 2.3) * 0.5 + 0.5;
+      ef.mesh.material.opacity = ef.baseOpacity * (0.4 + flicker * 0.6);
+      var s = 0.7 + flicker2 * 0.8;
+      ef.mesh.scale.set(s, s, s);
+      // Move fire slightly along normal (licking flames)
+      var rise = 0.003 + flicker * 0.008;
+      ef.mesh.position.copy(ef.basePos.clone().add(ef.normal.clone().multiplyScalar(rise)));
+      // Color shift orange<->red
+      var r = 0.8 + flicker * 0.2;
+      var g = 0.15 + flicker2 * 0.25;
+      ef.mesh.material.color.setRGB(r, g, 0);
+
+      // Smoke rises and pulses
+      if(ef.smoke){
+        var smokeRise = 0.02 + Math.sin(t * 0.8 + ef.phase) * 0.015 + flicker * 0.02;
+        ef.smoke.position.copy(ef.basePos.clone().add(ef.normal.clone().multiplyScalar(smokeRise)));
+        ef.smoke.material.opacity = 0.1 + flicker2 * 0.15;
+        var ss = 0.8 + Math.sin(t * 0.5 + ef.phase) * 0.4;
+        ef.smoke.scale.set(ss, ss, ss);
+      }
+    }
+    if(ef.type === 'scorch_ring'){
+      // Pulsing fiery border
+      var pulse = Math.sin(t * ef.speed + ef.phase) * 0.5 + 0.5;
+      ef.mesh.material.opacity = 0.1 + pulse * 0.2;
+      var r = 0.7 + pulse * 0.3;
+      var g = 0.1 + pulse * 0.15;
+      ef.mesh.material.color.setRGB(r, g, 0);
+    }
+  });
+
+  // Animate destroyed country polygon fills
+  countryFills.forEach(function(mesh){
+    if(mesh.userData.destroyed){
+      var elapsed = (performance.now() - mesh.userData.destroyTime) / 1000;
+      var pulse = Math.sin(elapsed * 2) * 0.5 + 0.5;
+      var pulse2 = Math.sin(elapsed * 3.7 + 1.2) * 0.5 + 0.5;
+      // Alternate between dark scorched and fiery red
+      var r = 0.15 + pulse * 0.2;
+      var g = 0.02 + pulse2 * 0.04;
+      var b = 0;
+      mesh.material.color.setRGB(r, g, b);
+      mesh.material.opacity = 0.25 + pulse * 0.15;
+    }
+  });
+
+  // Update HTML destruction labels (project to screen)
+  var W = renderer.domElement.clientWidth;
+  var H = renderer.domElement.clientHeight;
+  var hw = W / 2;
+  var hh = H / 2;
+  var container = document.getElementById('htmlMarkers');
+
+  destructionMarkerEls.forEach(function(dm){
+    if(!dm.el){
+      dm.el = document.createElement('div');
+      dm.el.className = 'destroyed-label';
+      dm.el.textContent = dm.text;
+      container.appendChild(dm.el);
+    }
+    var pos = _tempPos.copy(dm.pos3d).applyMatrix4(globeGroup.matrixWorld);
+    _tempViewDir.subVectors(camera.position, pos).normalize();
+    _tempNormal.copy(pos).normalize();
+    var isVisible = _tempNormal.dot(_tempViewDir) > 0.1;
+    if(isVisible){
+      pos.project(camera);
+      dm.el.style.left = ((pos.x * hw) + hw) + 'px';
+      dm.el.style.top = (-(pos.y * hh) + hh) + 'px';
+      dm.el.style.display = 'block';
+    } else {
+      dm.el.style.display = 'none';
+    }
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════
 // EXPLOSION V3 — NEW SYSTEM (built separately for safe testing)
