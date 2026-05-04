@@ -837,9 +837,25 @@ function initGlobe(){
   cv.addEventListener('dblclick', onDblClick);
   cv.addEventListener('contextmenu', e => e.preventDefault()); // prevent right-click menu
 
+  // Arrow keys rotate the globe (ignored when typing in inputs)
+  window.addEventListener('keydown', onArrowRotate);
+
   // Apply initial rotation
   applyRotation();
   animate();
+}
+
+function onArrowRotate(e){
+  var tag = (e.target && e.target.tagName) ? e.target.tagName : '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+  var step = e.shiftKey ? 18 : 8;
+  var handled = true;
+  if(e.key === 'ArrowLeft')      targetLon -= step;
+  else if(e.key === 'ArrowRight') targetLon += step;
+  else if(e.key === 'ArrowUp')    targetLat = Math.min(85, targetLat + step);
+  else if(e.key === 'ArrowDown')  targetLat = Math.max(-85, targetLat - step);
+  else handled = false;
+  if(handled) e.preventDefault();
 }
 
 function applyRotation(){
@@ -4318,69 +4334,71 @@ function triggerExplosionV4(lat, lng){
   globeGroup.add(co);
   explosionsV4.push({type:'v4_core', mesh:co, t:0, dur:1.6, sVar:sVar});
 
-  // ── GROUND SPLASH — wide flat dust cloud spreading at base ──
-  var spGeo = new THREE.SphereGeometry(splashRad, 56, 32);
-  var spMat = makeV4CloudMaterial(seed + 0.11, {
-    baseColor:    new THREE.Color(0.40, 0.32, 0.27),
-    underColor:   new THREE.Color(0.85, 0.45, 0.20),
-    shadowColor:  new THREE.Color(0.10, 0.07, 0.06),
-    highlightCol: new THREE.Color(0.85, 0.65, 0.45),
-    ampDisp: 0.34, freqDisp: 2.4, detailFreq: 8.5,
-    underAmount: 1.10, alphaMul: 1.0, rimSoftness: 0.45
+  // ── GROUND SPLASH — wide flat dust cloud (puff ring) ──
+  var splashBuilt = buildV4PuffCluster(makeV4SplashArrangement(), {
+    uTop:    new THREE.Vector3(0.85, 0.65, 0.50),
+    uUnder:  new THREE.Vector3(0.55, 0.32, 0.22),
+    uShadow: new THREE.Vector3(0.14, 0.08, 0.06),
+    uAlphaMul: 0.95,
+    uRimPow: 1.6,
+    uUp: N.clone()
   });
-  var sp = new THREE.Mesh(spGeo, spMat);
+  var sp = splashBuilt.group;
   sp.quaternion.copy(quatN);
   sp.position.copy(pos.clone().add(N.clone().multiplyScalar(splashRad*0.18)));
-  sp.scale.set(1.0, 0.32, 1.0); // flatten vertically — pancake cloud
+  sp.scale.set(splashRad, splashRad*0.32, splashRad);
   sp.renderOrder = 1;
-  spMat.uniforms.uUp.value.copy(N);
   globeGroup.add(sp);
   explosionsV4.push({
-    type:'v4_splash', mesh:sp, t:0, dur:yieldDuration*0.85,
+    type:'v4_splash', mesh:sp, puffs:splashBuilt.puffs, isCluster:true,
+    splashRad:splashRad,
+    t:0, dur:yieldDuration*0.85,
     sVar:sVar, baseR:splashRad, N:N.clone(), basePos:pos.clone()
   });
 
-  // ── STEM — thick column with shader cloud, rises from impact ──
-  var stGeo = new THREE.CylinderGeometry(stemRadius*0.85, stemRadius*1.25, stemLen, 32, 12, true);
-  var stMat = makeV4CloudMaterial(seed + 0.27, {
-    baseColor:    new THREE.Color(0.55, 0.32, 0.22),
-    underColor:   new THREE.Color(1.00, 0.50, 0.18),
-    shadowColor:  new THREE.Color(0.18, 0.10, 0.08),
-    highlightCol: new THREE.Color(1.00, 0.78, 0.50),
-    ampDisp: 0.34, freqDisp: 2.8, detailFreq: 10.0,
-    underAmount: 1.30, alphaMul: 1.0, rimSoftness: 0.55
+  // ── STEM — thick column (puff cluster), rises from impact ──
+  var stemBuilt = buildV4PuffCluster(makeV4StemArrangement(), {
+    uTop:    new THREE.Vector3(0.92, 0.62, 0.42),
+    uUnder:  new THREE.Vector3(0.55, 0.28, 0.18),
+    uShadow: new THREE.Vector3(0.16, 0.08, 0.06),
+    uAlphaMul: 0.95,
+    uRimPow: 1.5,
+    uUp: N.clone()
   });
-  var st = new THREE.Mesh(stGeo, stMat);
+  var st = stemBuilt.group;
   st.quaternion.copy(quatN);
   st.position.copy(pos.clone().add(N.clone().multiplyScalar(stemLen*0.5)));
-  st.scale.set(0.6, 0.08, 0.6); // start small + short, grows up
+  // Cluster is unit-height (-0.5..+0.5). Base scale: x/z = stemRadius*2, y = stemLen.
+  // Start very short and thinner, grow into full size.
+  st.scale.set(stemRadius*2*0.6, stemLen*0.08, stemRadius*2*0.6);
   st.renderOrder = 2;
-  stMat.uniforms.uUp.value.copy(N);
   globeGroup.add(st);
   explosionsV4.push({
-    type:'v4_stem', mesh:st, t:0, dur:yieldDuration,
-    sVar:sVar, stemLen:stemLen, N:N.clone(), basePos:pos.clone()
+    type:'v4_stem', mesh:st, puffs:stemBuilt.puffs, isCluster:true,
+    stemRadius:stemRadius, stemLen:stemLen,
+    t:0, dur:yieldDuration,
+    sVar:sVar, N:N.clone(), basePos:pos.clone()
   });
 
-  // ── CAP — fluffy cauliflower mushroom head ──
-  var cpGeo = new THREE.SphereGeometry(capRadius, 80, 64);
-  var cpMat = makeV4CloudMaterial(seed + 0.53, {
-    baseColor:    new THREE.Color(0.42, 0.28, 0.22),
-    underColor:   new THREE.Color(1.00, 0.48, 0.16),
-    shadowColor:  new THREE.Color(0.10, 0.06, 0.05),
-    highlightCol: new THREE.Color(0.92, 0.72, 0.50),
-    ampDisp: 0.46, freqDisp: 1.8, detailFreq: 6.5,
-    underAmount: 1.35, alphaMul: 1.0, rimSoftness: 0.62
+  // ── CAP — fluffy cauliflower mushroom head (puff cluster) ──
+  var capBuilt = buildV4PuffCluster(makeV4CapArrangement(), {
+    uTop:    new THREE.Vector3(0.96, 0.74, 0.62), // peach top
+    uUnder:  new THREE.Vector3(0.55, 0.30, 0.22), // shadowed underside
+    uShadow: new THREE.Vector3(0.18, 0.10, 0.08),
+    uAlphaMul: 1.0,
+    uRimPow: 1.4,
+    uUp: N.clone()
   });
-  var cp = new THREE.Mesh(cpGeo, cpMat);
+  var cp = capBuilt.group;
   cp.quaternion.copy(quatN);
   cp.position.copy(pos.clone().add(N.clone().multiplyScalar(capAltitude)));
-  cp.scale.set(0.25, 0.18, 0.25); // start small at impact
+  cp.scale.setScalar(capRadius * 0.25); // small at impact, will inflate
   cp.renderOrder = 3;
-  cpMat.uniforms.uUp.value.copy(N);
   globeGroup.add(cp);
   explosionsV4.push({
-    type:'v4_cap', mesh:cp, t:0, dur:yieldDuration,
+    type:'v4_cap', mesh:cp, puffs:capBuilt.puffs, isCluster:true,
+    capRadius:capRadius,
+    t:0, dur:yieldDuration,
     sVar:sVar, capAlt:capAltitude, N:N.clone(), basePos:pos.clone()
   });
 
@@ -4405,26 +4423,56 @@ function triggerExplosionV4(lat, lng){
   globeGroup.add(inMesh);
   explosionsV4.push({type:'v4_nucleus', mesh:inMesh, t:0, dur:yieldDuration*0.40, sVar:sVar, basePos:pos.clone(), N:N.clone()});
 
-  // ── WIDE LOW-ALTITUDE DUST RING — separate from splash, much wider, hugs surface ──
-  var drGeo = new THREE.SphereGeometry(splashRad*1.6, 64, 32);
-  var drMat = makeV4CloudMaterial(seed + 0.73, {
-    baseColor:    new THREE.Color(0.32, 0.25, 0.20),
-    underColor:   new THREE.Color(0.55, 0.30, 0.18),
-    shadowColor:  new THREE.Color(0.08, 0.05, 0.04),
-    highlightCol: new THREE.Color(0.65, 0.50, 0.38),
-    ampDisp: 0.40, freqDisp: 2.0, detailFreq: 7.5,
-    underAmount: 1.0, alphaMul: 0.85, rimSoftness: 0.50
+  // ── GROUND FIRE — small additive flame plume right at the impact ──
+  var fireGroup = new THREE.Group();
+  var fireFlames = [];
+  var fireGeo = getV4PuffGeometry();
+  var nFlames = 7;
+  for(var fi = 0; fi < nFlames; fi++){
+    var ang = (fi / nFlames) * Math.PI * 2;
+    var rad = 0.04 * sVar * (0.4 + Math.random() * 0.7);
+    var col = (fi % 3 === 0) ? 0xffe6a0 : (fi % 3 === 1 ? 0xff9530 : 0xff5018);
+    var fMat = new THREE.MeshBasicMaterial({
+      color: col, transparent: true, opacity: 0.95,
+      depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    var fMesh = new THREE.Mesh(fireGeo, fMat);
+    fMesh.position.set(Math.cos(ang) * rad, 0, Math.sin(ang) * rad);
+    var bs = 0.10 * sVar * (0.7 + Math.random() * 0.6);
+    fMesh.scale.setScalar(bs);
+    fireGroup.add(fMesh);
+    fireFlames.push({ mesh:fMesh, baseScale:bs, phase:Math.random()*Math.PI*2, lift:0.15 + Math.random()*0.35 });
+  }
+  fireGroup.quaternion.copy(quatN);
+  fireGroup.position.copy(pos.clone().add(N.clone().multiplyScalar(0.02*sVar)));
+  fireGroup.renderOrder = 8;
+  globeGroup.add(fireGroup);
+  explosionsV4.push({
+    type:'v4_fire', mesh:fireGroup, flames:fireFlames, isFireCluster:true,
+    sVar:sVar, t:0, dur:yieldDuration*0.55, basePos:pos.clone(), N:N.clone()
   });
-  var dr = new THREE.Mesh(drGeo, drMat);
+
+  // ── WIDE LOW-ALTITUDE DUST RING — sparse puff ring hugging the ground ──
+  var drBuilt = buildV4PuffCluster(makeV4DustRingArrangement(), {
+    uTop:    new THREE.Vector3(0.65, 0.50, 0.38),
+    uUnder:  new THREE.Vector3(0.40, 0.25, 0.18),
+    uShadow: new THREE.Vector3(0.10, 0.06, 0.05),
+    uAlphaMul: 0.78,
+    uRimPow: 1.7,
+    uUp: N.clone()
+  });
+  var dr = drBuilt.group;
   dr.quaternion.copy(quatN);
   dr.position.copy(pos.clone().add(N.clone().multiplyScalar(splashRad*0.10)));
-  dr.scale.set(0.20, 0.06, 0.20); // very flat pancake, starts small
+  var drR = splashRad * 1.6;
+  dr.scale.set(drR * 0.20, drR * 0.06, drR * 0.20);
   dr.renderOrder = 0;
-  drMat.uniforms.uUp.value.copy(N);
   globeGroup.add(dr);
   explosionsV4.push({
-    type:'v4_dustring', mesh:dr, t:0, dur:yieldDuration*1.05,
-    sVar:sVar, baseR:splashRad*1.6, N:N.clone(), basePos:pos.clone()
+    type:'v4_dustring', mesh:dr, puffs:drBuilt.puffs, isCluster:true,
+    drR:drR,
+    t:0, dur:yieldDuration*1.05,
+    sVar:sVar, baseR:drR, N:N.clone(), basePos:pos.clone()
   });
 
   // ── SHOCKWAVE RINGS — additive bright bands sweeping across the surface ──
@@ -4503,8 +4551,20 @@ function triggerExplosionV4(lat, lng){
 function updateExplosionsV4(dt){
   function kill(e){
     globeGroup.remove(e.mesh);
-    if(e.mesh.geometry) e.mesh.geometry.dispose();
-    if(e.mesh.material) e.mesh.material.dispose();
+    if(e.isCluster && e.puffs){
+      for(var ki = 0; ki < e.puffs.length; ki++){
+        var km = e.puffs[ki].mesh.material;
+        if(km) km.dispose();
+      }
+    } else if(e.isFireCluster && e.flames){
+      for(var ki2 = 0; ki2 < e.flames.length; ki2++){
+        var km2 = e.flames[ki2].mesh.material;
+        if(km2) km2.dispose();
+      }
+    } else {
+      if(e.mesh.geometry) e.mesh.geometry.dispose();
+      if(e.mesh.material) e.mesh.material.dispose();
+    }
     e.dead = true;
   }
 
@@ -4532,29 +4592,38 @@ function updateExplosionsV4(dt){
     }
 
     if(e.type === 'v4_splash'){
-      // Spreads radially, stays flat, fades long
       var spread = easeOutCubic(smoothstep(0, 0.45, life));
-      var sx = 0.30 + 1.20 * spread;
-      var sy = 0.18 + 0.18 * spread;
-      e.mesh.scale.set(sx, sy, sx);
-      e.mesh.material.uniforms.uTime.value = e.t;
-      e.mesh.material.uniforms.uLife.value = life;
+      var sxFrac = 0.30 + 1.20 * spread;
+      var syFrac = 0.18 + 0.18 * spread;
+      var R = e.splashRad || 1.0;
+      e.mesh.scale.set(R * sxFrac, R * syFrac, R * sxFrac);
+      if(life > 0.5 && e.puffs){
+        var fadeAmt = 1 - smoothstep(0.5, 1.0, life);
+        for(var pi = 0; pi < e.puffs.length; pi++){
+          var pm = e.puffs[pi].mesh.material;
+          if(pm && pm.uniforms && pm.uniforms.uAlphaMul) pm.uniforms.uAlphaMul.value = fadeAmt * 0.95;
+        }
+      }
       if(life >= 1) kill(e);
       return;
     }
 
     if(e.type === 'v4_stem'){
-      // Stem extends rapidly: 0→full length over first 35% of life
       var extend = easeOutCubic(smoothstep(0, 0.35, life));
       var fatten = smoothstep(0, 0.4, life);
-      var sx = 0.55 + 0.65 * fatten;
-      var sy = 0.08 + 0.92 * extend;
-      e.mesh.scale.set(sx, sy, sx);
-      // Recenter so stem base stays anchored at impact
-      var halfLen = e.stemLen * 0.5 * sy;
+      var sxFrac = 0.55 + 0.65 * fatten;
+      var syFrac = 0.08 + 0.92 * extend;
+      var baseXZ = e.stemRadius * 2;
+      e.mesh.scale.set(baseXZ * sxFrac, e.stemLen * syFrac, baseXZ * sxFrac);
+      var halfLen = e.stemLen * 0.5 * syFrac;
       e.mesh.position.copy(e.basePos.clone().add(e.N.clone().multiplyScalar(halfLen)));
-      e.mesh.material.uniforms.uTime.value = e.t;
-      e.mesh.material.uniforms.uLife.value = life;
+      if(life > 0.7 && e.puffs){
+        var fadeAmt = 1 - smoothstep(0.7, 1.0, life);
+        for(var pi = 0; pi < e.puffs.length; pi++){
+          var pm = e.puffs[pi].mesh.material;
+          if(pm && pm.uniforms && pm.uniforms.uAlphaMul) pm.uniforms.uAlphaMul.value = fadeAmt * 0.95;
+        }
+      }
       if(life >= 1) kill(e);
       return;
     }
@@ -4607,20 +4676,117 @@ function updateExplosionsV4(dt){
     if(e.type === 'v4_cap'){
       // Cap inflates from small to full + drifts up slightly during linger
       var inflate = easeOutCubic(smoothstep(0.05, 0.45, life));
-      var s = 0.25 + 1.05 * inflate; // 0.25 → 1.30 (slight overshoot)
-      // Settle back from overshoot
+      var s = 0.25 + 1.05 * inflate;
       if(life > 0.45){
         var settle = smoothstep(0.45, 0.65, life);
         s = 1.30 - 0.18 * settle;
       }
-      e.mesh.scale.set(s, s*0.85, s); // slightly oblate (cauliflower shape)
-      // Cap rises with stem extension, then drifts up
+      var sBase = e.capRadius || 1.0;
+      e.mesh.scale.set(sBase * s, sBase * s * 0.85, sBase * s);
       var rise = easeOutCubic(smoothstep(0, 0.35, life));
       var drift = smoothstep(0.45, 1.0, life) * 0.25;
       var alt = e.capAlt * (0.30 + 0.70 * rise + drift);
       e.mesh.position.copy(e.basePos.clone().add(e.N.clone().multiplyScalar(alt)));
-      e.mesh.material.uniforms.uTime.value = e.t;
-      e.mesh.material.uniforms.uLife.value = life;
+      // Fade the cluster as life ends
+      if(life > 0.7 && e.puffs){
+        var fadeAmt = 1 - smoothstep(0.7, 1.0, life);
+        for(var pi = 0; pi < e.puffs.length; pi++){
+          var pm = e.puffs[pi].mesh.material;
+          if(pm && pm.uniforms && pm.uniforms.uAlphaMul) pm.uniforms.uAlphaMul.value = fadeAmt;
+        }
+      }
+      if(life >= 1) kill(e);
+      return;
+    }
+
+    if(e.type === 'v4_brightcore'){
+      // Pulse and fade — visible glow under the cap during early stages
+      var pulse = 1 + 0.4 * Math.sin(e.t * 14);
+      var grow = 1 + e.t * 1.8;
+      e.mesh.scale.setScalar(grow * pulse);
+      e.mesh.material.opacity = Math.max(0, 0.85 * Math.pow(1 - life, 1.4));
+      if(life >= 1) kill(e);
+      return;
+    }
+
+    if(e.type === 'v4_nucleus'){
+      // White-hot kernel — flares briefly then collapses
+      var flare = e.t < 0.15 ? (1 + e.t * 18) : (1 + 0.15*18) * (1 - smoothstep(0.15, 0.5, e.t)*0.6);
+      e.mesh.scale.setScalar(flare);
+      e.mesh.material.opacity = Math.max(0, 1.0 * Math.pow(1 - life, 2.2));
+      if(life >= 1) kill(e);
+      return;
+    }
+
+    if(e.type === 'v4_fire'){
+      // Each flame puff flickers, lifts a little, and fades. Cluster lives
+      // entirely under the cap so it hugs the impact crater.
+      var fade = 1 - smoothstep(0.55, 1.0, life);
+      for(var fi2 = 0; fi2 < e.flames.length; fi2++){
+        var f = e.flames[fi2];
+        var flick = 0.85 + 0.30 * Math.sin(e.t * 18 + f.phase) + 0.10 * Math.sin(e.t * 47 + f.phase * 2);
+        f.mesh.scale.setScalar(f.baseScale * flick);
+        // Local lift along cluster's local up (cluster is oriented to surface normal)
+        f.mesh.position.y = f.lift * e.sVar * smoothstep(0, 0.4, life) * (0.6 + 0.4 * flick);
+        f.mesh.material.opacity = Math.max(0, 0.95 * fade * (0.7 + 0.3 * flick));
+      }
+      if(life >= 1) kill(e);
+      return;
+    }
+
+    if(e.type === 'v4_dustring'){
+      var spread = easeOutCubic(smoothstep(0, 0.55, life));
+      var sxFrac = 0.20 + 1.30 * spread;
+      var syFrac = 0.06 + 0.10 * smoothstep(0, 0.7, life);
+      var R = e.drR || 1.0;
+      e.mesh.scale.set(R * sxFrac, R * syFrac, R * sxFrac);
+      if(life > 0.55 && e.puffs){
+        var fadeAmt = 1 - smoothstep(0.55, 1.0, life);
+        for(var pi = 0; pi < e.puffs.length; pi++){
+          var pm = e.puffs[pi].mesh.material;
+          if(pm && pm.uniforms && pm.uniforms.uAlphaMul) pm.uniforms.uAlphaMul.value = fadeAmt * 0.78;
+        }
+      }
+      if(life >= 1) kill(e);
+      return;
+    }
+
+    if(e.type === 'v4_shockring'){
+      // Expanding ring on globe surface
+      var grow = 1 + e.t * e.spd * 18;
+      e.mesh.scale.set(grow, grow, 1);
+      e.mesh.material.opacity = Math.max(0, (0.9 - e.idx*0.20) * (1 - life));
+      if(life >= 1) kill(e);
+      return;
+    }
+
+    if(e.type === 'v4_embers'){
+      // Rising/spiraling embers
+      var positions = e.mesh.geometry.attributes.position.array;
+      // Tangent basis from N (stable per-explosion)
+      var T1 = new THREE.Vector3(1,0,0).cross(e.N);
+      if(T1.lengthSq() < 0.01) T1 = new THREE.Vector3(0,1,0).cross(e.N);
+      T1.normalize();
+      var T2 = e.N.clone().cross(T1).normalize();
+      for(var i=0; i<e.n; i++){
+        var d = e.data[i];
+        var lt = Math.max(0, e.t - d.delay);
+        var fr = Math.min(1, lt / d.life);
+        var rise = lt * d.riseSpd * 8;
+        var ang = d.spiralPhase + lt * d.spiralSpd;
+        var sx = Math.cos(ang) * d.spiralR * (0.5 + fr*1.5);
+        var sy = Math.sin(ang) * d.spiralR * (0.5 + fr*1.5);
+        var p = e.basePos.clone()
+          .add(d.offsetVec)
+          .add(e.N.clone().multiplyScalar(rise))
+          .add(T1.clone().multiplyScalar(sx))
+          .add(T2.clone().multiplyScalar(sy));
+        positions[i*3]   = p.x;
+        positions[i*3+1] = p.y;
+        positions[i*3+2] = p.z;
+      }
+      e.mesh.geometry.attributes.position.needsUpdate = true;
+      e.mesh.material.opacity = Math.max(0, 0.9 * (1 - life));
       if(life >= 1) kill(e);
       return;
     }
