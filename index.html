@@ -706,6 +706,7 @@ function intensityColor(i){return{war:"#f85149",high:"#d29922",medium:"#e3b341",
 
 // ─── THREE.JS Globe ───
 let scene, camera, renderer, globeGroup, globeMesh, atmosMesh;
+let earthTexture = null; // shared by destructible-earth chunks
 let clock, raycaster, mouse2D = new THREE.Vector2(-999,-999);
 let markerObjects = [];
 let arcObjects = [];
@@ -891,6 +892,7 @@ function loadEarthTextures(){
   loader.load(earthTexUrl, (tex) => {
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     earthTex = tex;
+    earthTexture = tex; // expose for destructible-earth chunks
     tryApply();
   });
   loader.load(bumpTexUrl, (tex) => { bumpTex = tex; tryApply(); });
@@ -4179,6 +4181,82 @@ var V4_CRUST_PALETTE = [
   0x55504a, 0x3a352f, 0x2a2620             // ash / scorched
 ];
 
+// ───────────────────────────────────────────────
+// Earth-skin chunk — small spherical-cap patch UV-mapped to the live earth
+// texture at the impact lat/lng. The chunk *looks like the actual ground
+// from that location* because its UVs sample the same Blue Marble bitmap
+// the globe is using.
+//
+// pos        — impact position in globe-local space (length ≈ globeRadius)
+// angSize    — angular half-size of the patch in radians (typical ~0.04)
+// returns    — { mesh, geometry, material } (caller disposes geo/mat on death)
+// ───────────────────────────────────────────────
+function createEarthSkinChunk(pos, angSize){
+  // Patch geometry: a spherical cap, oriented along world +Y, at radius
+  // globeRadius. We then rotate it into place via quaternion below.
+  // PhiStart = 0 means the cap is centered on +Y; thetaLength = 2PI gives
+  // a full disc; phiLength = angSize gives the cap half-angle.
+  var geo = new THREE.SphereGeometry(
+    globeRadius,
+    20, 16,            // segments
+    0, Math.PI * 2,    // theta full
+    0, angSize         // phi (cap half-angle)
+  );
+
+  // Convert pos to lat/lng so we can rewrite UVs to sample the texture
+  // at that exact spot on the bitmap.
+  var p = pos.clone().normalize();
+  var lat = Math.asin(p.y) * 180 / Math.PI;
+  var lng = Math.atan2(-p.x, p.z) * 180 / Math.PI - 180;
+  if(lng < -180) lng += 360;
+  if(lng >  180) lng -= 360;
+
+  // The Blue Marble texture is an equirectangular projection: x=lng, y=lat.
+  // For each vertex of the cap, compute its actual lat/lng once it's
+  // rotated to the impact site, and map that to UV space.
+  var quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), p);
+  var posAttr = geo.attributes.position;
+  var uvAttr  = geo.attributes.uv;
+  var v = new THREE.Vector3();
+  for(var i = 0; i < posAttr.count; i++){
+    v.fromBufferAttribute(posAttr, i);
+    v.applyQuaternion(quat);     // vertex in globe-local space
+    var vn = v.clone().normalize();
+    var vLat = Math.asin(vn.y) * 180 / Math.PI;
+    var vLng = Math.atan2(-vn.x, vn.z) * 180 / Math.PI - 180;
+    if(vLng < -180) vLng += 360;
+    if(vLng >  180) vLng -= 360;
+    var u = (vLng + 180) / 360;  // 0..1
+    var w = (vLat +  90) / 180;  // 0..1 (south=0, north=1)
+    uvAttr.setXY(i, u, w);
+  }
+  uvAttr.needsUpdate = true;
+  // Bake the rotation so vertices sit on the impact site in world space,
+  // then re-center the geometry to origin so mesh.position is the chunk's
+  // world location. (Otherwise the physics loop's mesh.position.copy(pos)
+  // would double-offset the patch.)
+  geo.applyQuaternion(quat);
+  geo.translate(-pos.x, -pos.y, -pos.z);
+  geo.computeVertexNormals();
+
+  var mat = earthTexture
+    ? new THREE.MeshLambertMaterial({
+        map: earthTexture,
+        side: THREE.DoubleSide,
+        emissive: new THREE.Color(0x1a0a02),
+        emissiveIntensity: 0.4
+      })
+    : new THREE.MeshLambertMaterial({
+        color: 0x6b4a2b,
+        side: THREE.DoubleSide
+      });
+  mat.transparent = true;
+  mat.opacity = 1.0;
+
+  var mesh = new THREE.Mesh(geo, mat);
+  return { mesh: mesh, geometry: geo, material: mat };
+}
+
 function spawnV4Ejecta(pos, N, sVar, yieldScale){
   var T1 = new THREE.Vector3(1,0,0).cross(N).normalize();
   if(T1.lengthSq() < 0.01) T1 = new THREE.Vector3(0,1,0).cross(N).normalize();
@@ -4263,6 +4341,66 @@ function spawnV4Ejecta(pos, N, sVar, yieldScale){
       dur: 4.5 + Math.random()*2.5,
       fadeIn: 0.8,                 // fade-out over last fadeIn seconds
       sharedGeo: true              // don't dispose shared geometry on kill
+    });
+  }
+
+  // ── EARTH-SKIN CHUNKS — patches of the actual planet surface lifting off ──
+  // Fewer + bigger than the primitive debris. UV-sampled from the live earth
+  // texture so they look like real ground from the impact location.
+  var nSkin = 5 + Math.floor(yieldScale * 5); // 5 → 10
+  var skinAngBase = 0.022 + 0.014 * yieldScale; // patch half-angle in radians
+  for(var sj = 0; sj < nSkin; sj++){
+    var sang = Math.random() * Math.PI * 2;
+    var sradial = Math.pow(Math.random(), 0.5) * spawnRMax * 0.8;
+    var soff = T1.clone().multiplyScalar(Math.cos(sang) * sradial)
+              .add(T2.clone().multiplyScalar(Math.sin(sang) * sradial));
+    var spawnPos2 = pos.clone().add(soff).add(N.clone().multiplyScalar(0.002));
+    var sradialFrac = sradial / (spawnRMax + 1e-6);
+
+    // Skin patches lift more vertically than primitives — they ARE the ground
+    var upMag2   = (0.06 + Math.random() * 0.08) * (0.7 + yieldScale*0.5) * (1.2 - sradialFrac*0.4);
+    var sideMag2 = (0.025 + Math.random() * 0.04) * (0.6 + yieldScale*0.5);
+    var sideAng2 = Math.random() * Math.PI * 2;
+    var vel2 = N.clone().multiplyScalar(upMag2);
+    vel2.add(T1.clone().multiplyScalar(Math.cos(sideAng2) * sideMag2));
+    vel2.add(T2.clone().multiplyScalar(Math.sin(sideAng2) * sideMag2));
+    if(sradialFrac > 0.2){
+      var outDir2 = soff.clone().normalize();
+      vel2.add(outDir2.multiplyScalar(sideMag2 * sradialFrac * 1.0));
+    }
+
+    // Position the patch where it would naturally sit on the globe — at
+    // the same lat/lng as spawnPos2, on the surface. The helper rotates
+    // the geometry into that spot.
+    // Lift the spawn slightly above the surface so the ground-hit check
+    // doesn't fire on frame 1.
+    var skinPos = spawnPos2.clone().normalize().multiplyScalar(globeRadius * 1.005);
+    var angSize = skinAngBase * (0.7 + Math.random() * 0.7);
+    var skin = createEarthSkinChunk(skinPos, angSize);
+    skin.mesh.renderOrder = 4;
+    globeGroup.add(skin.mesh);
+
+    explosionsV4.push({
+      type: 'v4_crust',
+      mesh: skin.mesh,
+      glowMesh: null,
+      isHot: false,
+      pos: skinPos.clone(),
+      vel: vel2,
+      angVel: new THREE.Vector3(
+        (Math.random()-0.5)*3.5,
+        (Math.random()-0.5)*3.5,
+        (Math.random()-0.5)*3.5
+      ),
+      mode: 'ballistic',
+      escapeAt: Infinity,
+      gravStrength: 0.16 + Math.random()*0.05,
+      escapeOutward: 0.05,
+      t: 0,
+      dur: 5.0 + Math.random()*2.5,
+      fadeIn: 1.0,
+      sharedGeo: false,            // unique per-chunk geometry, dispose on kill
+      isEarthSkin: true
     });
   }
 }
@@ -4661,7 +4799,9 @@ function updateExplosionsV4(dt){
       var hitGround = e.mode === 'ballistic' && e.pos.length() < globeRadius * 1.001;
       if(life >= 1 || hitGround){
         globeGroup.remove(e.mesh);
-        // Don't dispose shared geometry; do dispose per-chunk material
+        // Earth-skin chunks have unique per-chunk geometry; primitive chunks
+        // share a pooled geometry and only their material is per-chunk.
+        if(!e.sharedGeo && e.mesh.geometry) e.mesh.geometry.dispose();
         if(e.mesh.material) e.mesh.material.dispose();
         if(e.glowMesh){
           globeGroup.remove(e.glowMesh);
