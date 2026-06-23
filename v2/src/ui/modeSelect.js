@@ -1,4 +1,14 @@
 import { MODE_LIST } from '../data/modes.js';
+import { Store } from '../core/storage.js';
+
+/** A small "your best" line per mode, shown only once a game has been played. */
+function recordBadge(modeId) {
+  const r = Store.records(modeId);
+  if (modeId === 'arcade') {
+    return r.bestScore ? `<div class="mode-record mono">BEST ${r.bestScore.toLocaleString()}</div>` : '';
+  }
+  return r.wins ? `<div class="mode-record mono">${r.wins} WIN${r.wins > 1 ? 'S' : ''} · ${r.bestEarthPct}% SAVED</div>` : '';
+}
 
 /**
  * Renders the mode-select overlay. Resolves with the chosen mode profile.
@@ -17,6 +27,7 @@ export function showModeSelect() {
         <div class="mode-feats">
           ${m.feats.map((f) => `<div class="mode-feat">${f}</div>`).join('')}
         </div>
+        ${recordBadge(m.id)}
       </div>`
     ).join('');
 

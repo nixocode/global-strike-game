@@ -1,5 +1,6 @@
 import { fmt } from '../sim/Simulation.js';
 import { winterStage } from '../sim/winter.js';
+import { Store } from '../core/storage.js';
 
 const META = {
   victory: { title: 'VICTORY', sub: 'Enemies neutralized — Earth endures.', icon: '☢️', color: 'var(--green)' },
@@ -17,6 +18,14 @@ export function showGameOver({ outcome, state, destroyed }) {
   const alive = state.player.cities.filter((c) => c.pop > 0).length;
   const wStage = winterStage(state.winterIndex);
   const wColor = state.winterIndex >= 0.7 ? 'var(--red)' : state.winterIndex >= 0.4 ? 'var(--orange)' : 'var(--yellow)';
+
+  // fold this game into the persistent records
+  const { newRecord, records } = Store.recordGame({
+    modeId: state.mode.id, score: state.score, kills: state.totalKills, outcome, earthPct,
+  });
+  const recordLine = arcade
+    ? `Best score: <b style="color:var(--yellow)">${(records.bestScore || 0).toLocaleString()}</b>`
+    : `Victories: <b style="color:var(--green)">${records.wins || 0}</b> · Best planet saved: <b style="color:var(--green)">${records.bestEarthPct || 0}%</b>`;
 
   const rows = state.nations
     .filter((n) => n.casualties > 0)
@@ -36,7 +45,8 @@ export function showGameOver({ outcome, state, destroyed }) {
       <div class="title" style="color:${m.color}">${m.title}</div>
       <div class="subtitle" style="margin:0 auto 18px">${m.sub}</div>
       ${arcade ? `<div class="mono" style="font-size:13px;color:var(--text3);letter-spacing:2px">FINAL SCORE</div>
-        <div class="mono" style="font-size:42px;font-weight:700;color:var(--yellow);margin-bottom:18px">${state.score.toLocaleString()}</div>` : ''}
+        <div class="mono" style="font-size:42px;font-weight:700;color:var(--yellow);margin-bottom:6px">${state.score.toLocaleString()}</div>` : ''}
+      ${newRecord ? '<div class="go-newrecord">★ NEW RECORD ★</div>' : ''}
       <div class="go-stats">
         <div class="go-stat"><div class="v" style="color:${earthColor}">${earthPct}%</div><div class="l">Earth Intact</div></div>
         <div class="go-stat"><div class="v" style="color:var(--red)">${fmt(state.totalKills)}</div><div class="l">Casualties</div></div>
@@ -45,6 +55,7 @@ export function showGameOver({ outcome, state, destroyed }) {
         ${arcade ? '' : `<div class="go-stat"><div class="v" style="color:${wColor};text-transform:uppercase">${wStage}</div><div class="l">Nuclear Winter</div></div>`}
       </div>
       <div class="go-breakdown">${rows}</div>
-      <button class="btn primary" style="width:100%;margin-top:18px" onclick="location.reload()">Play again</button>
+      <div class="go-record mono">${recordLine}</div>
+      <button class="btn primary" style="width:100%;margin-top:14px" onclick="location.reload()">Play again</button>
     </div></div>`;
 }

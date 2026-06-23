@@ -16,6 +16,7 @@ import { showModeSelect } from './ui/modeSelect.js';
 import { showSetup } from './ui/setup.js';
 import { HUD } from './ui/hud.js';
 import { showGameOver } from './ui/gameOver.js';
+import { PauseMenu } from './ui/pauseMenu.js';
 import { toast } from './ui/toast.js';
 import { AudioManager } from './audio/audio.js';
 
@@ -68,6 +69,12 @@ class Game {
     this.shockwaves = new ShockwaveLayer(this.globe, this.bus);
     this.audio = new AudioManager(this.bus);
     window.__audio = this.audio; // dev handle (e.g. __audio.toggle())
+    // pause / settings — only pausable once actually in a turn (not menus/game-over)
+    this.pause = new PauseMenu({
+      loop: this.loop,
+      audio: this.audio,
+      canPause: () => this.state.player && this.state.phase !== Phase.GAME_OVER,
+    });
     this.regions = new RegionLabels(this.globe);
     this.explosions = new ExplosionLayer(this.globe, this.bus, mode);
     this.chunks = new ChunkLayer(this.globe, this.bus, mode);
