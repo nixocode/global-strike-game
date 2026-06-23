@@ -1,0 +1,19 @@
+{
+  "name": "global-strike-v2",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Global Strike — nuclear strategy game. Realistic simulation + arcade spectacle modes.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "topojson-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
