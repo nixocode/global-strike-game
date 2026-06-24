@@ -6,7 +6,7 @@ export default defineConfig({
   build: {
     target: 'es2020',
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false, // don't ship readable source maps to the public deploy
   },
   server: {
     port: 5173,

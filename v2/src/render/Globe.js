@@ -24,9 +24,12 @@ const ImpactFXShader = {
     }`,
 };
 
-export const EARTH_TEX = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-blue-marble.jpg';
-const BUMP_TEX = 'https://unpkg.com/three-globe@2.31.1/example/img/earth-topology.png';
-const ATLAS = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+// Vendored locally (see v2/public/) so the globe never depends on third-party CDNs
+// at runtime. BASE_URL keeps the paths correct whether served from root or a subpath.
+const ASSET = import.meta.env.BASE_URL;
+export const EARTH_TEX = `${ASSET}textures/earth-blue-marble.jpg`;
+const BUMP_TEX = `${ASSET}textures/earth-topology.png`;
+const ATLAS = `${ASSET}data/countries-110m.json`;
 
 export const GLOBE_RADIUS = 1;
 
